@@ -21,6 +21,14 @@ import {
   Link2,
   X,
   MessageSquareText,
+  BellRing,
+  CalendarClock,
+  Flame,
+  ArrowLeftRight,
+  HeartPulse,
+  Lightbulb,
+  Building2,
+  Palette,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -50,12 +58,31 @@ const navSections = [
     ],
   },
   {
+    label: "Pulse AI",
+    items: [
+      { name: "AI Insights", href: "/dashboard/insights", icon: Sparkles },
+      { name: "Chat AI", href: "/dashboard/pulse-ai", icon: MessageSquareText },
+      { name: "Alertas", href: "/dashboard/alerts", icon: BellRing },
+      { name: "Recomendações", href: "/dashboard/recommendations", icon: Lightbulb },
+      { name: "Comparação", href: "/dashboard/comparison", icon: ArrowLeftRight },
+      { name: "Saúde de Páginas", href: "/dashboard/page-health", icon: HeartPulse },
+      { name: "Benchmarks", href: "/dashboard/benchmarks", icon: Target },
+    ],
+  },
+  {
     label: "Intelligence",
     items: [
       { name: "Events", href: "/dashboard/events", icon: MousePointerClick },
       { name: "Goals", href: "/dashboard/goals", icon: Target },
-      { name: "AI Insights", href: "/dashboard/insights", icon: Sparkles },
-      { name: "Pulse AI", href: "/dashboard/pulse-ai", icon: MessageSquareText },
+      { name: "Heatmap", href: "/dashboard/heatmap", icon: Flame },
+    ],
+  },
+  {
+    label: "Agência",
+    items: [
+      { name: "Clientes", href: "/dashboard/agency", icon: Building2 },
+      { name: "Relatórios", href: "/dashboard/reports", icon: CalendarClock },
+      { name: "White-Label", href: "/dashboard/white-label", icon: Palette },
     ],
   },
 ];
