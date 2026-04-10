@@ -1,4 +1,8 @@
+"use client";
+
 import { Eye, Zap, Brain, Lock, Users, BarChart3 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal, Stagger, MotionItem } from "./motion";
 
 const benefits = [
   {
@@ -60,12 +64,11 @@ const benefits = [
 export default function Benefits() {
   return (
     <section id="beneficios" className="relative py-24 lg:py-32">
-      {/* Subtle top gradient */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
 
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Section header */}
-        <div className="max-w-2xl mx-auto text-center mb-16">
+        <Reveal className="max-w-2xl mx-auto text-center mb-16">
           <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
             Por que ClarityPulse
           </span>
@@ -78,49 +81,54 @@ export default function Benefits() {
             decisões. Sem fricção, sem curva de aprendizado, sem compromissos com
             privacidade.
           </p>
-        </div>
+        </Reveal>
 
         {/* Benefits grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <Stagger slow className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {benefits.map((benefit) => {
             const Icon = benefit.icon;
             return (
-              <div
-                key={benefit.title}
-                className="group relative p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-jade/20 hover:bg-jade/[0.02] transition-all duration-300"
-              >
-                {/* Icon */}
-                <div className="w-11 h-11 rounded-xl bg-jade/[0.06] border border-jade/[0.12] flex items-center justify-center mb-5 group-hover:bg-jade/[0.1] transition-colors">
-                  <Icon size={20} className="text-jade" strokeWidth={1.4} />
-                </div>
+              <MotionItem key={benefit.title}>
+                <motion.div
+                  whileHover={{ y: -6, transition: { duration: 0.3, ease: "easeOut" } }}
+                  className="group relative p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-jade/20 hover:bg-jade/[0.02] transition-all duration-300 h-full flex flex-col"
+                >
+                  {/* Hover glow */}
+                  <div className="absolute inset-0 rounded-2xl bg-jade/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-                {/* Content */}
-                <div className="mb-4">
-                  <span className="text-[10px] font-mono text-jade/60 uppercase tracking-wider">
-                    {benefit.subtitle}
-                  </span>
-                  <h3 className="font-display font-bold text-[17px] text-white mt-1 tracking-tight">
-                    {benefit.title}
-                  </h3>
-                </div>
+                  {/* Icon */}
+                  <div className="relative w-11 h-11 rounded-xl bg-jade/[0.06] border border-jade/[0.12] flex items-center justify-center mb-5 group-hover:bg-jade/[0.1] group-hover:border-jade/[0.2] transition-all duration-300">
+                    <Icon size={20} className="text-jade" strokeWidth={1.4} />
+                  </div>
 
-                <p className="text-[13px] text-ghost leading-relaxed mb-5">
-                  {benefit.description}
-                </p>
+                  {/* Content */}
+                  <div className="relative mb-4">
+                    <span className="text-[10px] font-mono text-jade/60 uppercase tracking-wider">
+                      {benefit.subtitle}
+                    </span>
+                    <h3 className="font-display font-bold text-[17px] text-white mt-1 tracking-tight">
+                      {benefit.title}
+                    </h3>
+                  </div>
 
-                {/* Stat */}
-                <div className="flex items-end gap-2 pt-4 border-t border-white/[0.04]">
-                  <span className="font-display font-extrabold text-2xl text-jade tracking-tight">
-                    {benefit.stat}
-                  </span>
-                  <span className="text-[11px] font-mono text-ghost/50 mb-1">
-                    {benefit.statLabel}
-                  </span>
-                </div>
-              </div>
+                  <p className="relative text-[13px] text-ghost leading-relaxed mb-5 flex-1">
+                    {benefit.description}
+                  </p>
+
+                  {/* Stat */}
+                  <div className="relative flex items-end gap-2 pt-4 border-t border-white/[0.04]">
+                    <span className="font-display font-extrabold text-2xl text-jade tracking-tight">
+                      {benefit.stat}
+                    </span>
+                    <span className="text-[11px] font-mono text-ghost/50 mb-1">
+                      {benefit.statLabel}
+                    </span>
+                  </div>
+                </motion.div>
+              </MotionItem>
             );
           })}
-        </div>
+        </Stagger>
       </div>
     </section>
   );

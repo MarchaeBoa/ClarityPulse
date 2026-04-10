@@ -1,4 +1,9 @@
+"use client";
+
 import { AlertTriangle, Clock, Cookie, Brain, Shield, Zap } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal, Stagger, MotionItem } from "./motion";
+import { cn } from "@/lib/utils";
 
 const painPoints = [
   {
@@ -6,49 +11,61 @@ const painPoints = [
     title: "Banners de cookies espantam visitantes",
     description:
       "42% dos visitantes rejeitam cookies. Você perde quase metade dos seus dados antes de começar a analisar.",
-    accent: "ember",
+    accent: "ember" as const,
   },
   {
     icon: AlertTriangle,
     title: "Dados amostrais que mentem",
     description:
       "O GA4 amostra dados acima de 500k eventos. Suas decisões de negócio estão baseadas em estimativas, não em fatos.",
-    accent: "gold",
+    accent: "gold" as const,
   },
   {
     icon: Clock,
     title: "30 minutos para achar um número",
     description:
       "Relatórios exploratórios, segmentos encadeados, dimensões secundárias. Você precisa de respostas, não de um curso.",
-    accent: "ember",
+    accent: "ember" as const,
   },
   {
     icon: Brain,
     title: "Dados sem significado",
     description:
       "Ter dados não é ter insights. Sem IA interpretando padrões, seu dashboard é um painel bonito que ninguém consulta.",
-    accent: "sapphire",
+    accent: "sapphire" as const,
   },
   {
     icon: Shield,
     title: "Compliance que nunca acaba",
     description:
       "GDPR, LGPD, ePrivacy. A cada regulamentação, mais configuração. Analytics não deveria ser um risco jurídico.",
-    accent: "ember",
+    accent: "ember" as const,
   },
   {
     icon: Zap,
     title: "Scripts que pesam 45kb+",
     description:
       "gtag.js carrega 45kb+ e adiciona 300ms+ ao LCP. Seu analytics está sabotando seu Core Web Vitals.",
-    accent: "gold",
+    accent: "gold" as const,
   },
 ];
 
-const accentMap: Record<string, { bg: string; text: string; border: string }> = {
-  ember: { bg: "bg-ember/10", text: "text-ember", border: "border-ember/20" },
-  gold: { bg: "bg-gold/10", text: "text-gold", border: "border-gold/20" },
-  sapphire: { bg: "bg-sapphire/10", text: "text-sapphire", border: "border-sapphire/20" },
+const accentStyles = {
+  ember: {
+    iconBg: "bg-ember/10 border-ember/20",
+    iconColor: "text-ember",
+    hover: "hover:border-ember/20",
+  },
+  gold: {
+    iconBg: "bg-gold/10 border-gold/20",
+    iconColor: "text-gold",
+    hover: "hover:border-gold/20",
+  },
+  sapphire: {
+    iconBg: "bg-sapphire/10 border-sapphire/20",
+    iconColor: "text-sapphire",
+    hover: "hover:border-sapphire/20",
+  },
 };
 
 export default function WhySwitch() {
@@ -56,7 +73,7 @@ export default function WhySwitch() {
     <section className="relative py-24 lg:py-32">
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Section header */}
-        <div className="max-w-2xl mx-auto text-center mb-16">
+        <Reveal className="max-w-2xl mx-auto text-center mb-16">
           <span className="inline-block text-[11px] font-mono text-ember uppercase tracking-[0.15em] mb-4">
             O problema
           </span>
@@ -69,33 +86,36 @@ export default function WhySwitch() {
             founders ou profissionais de marketing que precisam de respostas rápidas
             e dados confiáveis.
           </p>
-        </div>
+        </Reveal>
 
         {/* Pain points grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Stagger className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {painPoints.map((point) => {
-            const colors = accentMap[point.accent];
+            const colors = accentStyles[point.accent];
             const Icon = point.icon;
             return (
-              <div
-                key={point.title}
-                className="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.08] hover:bg-white/[0.03] transition-all duration-300"
-              >
-                <div
-                  className={`w-10 h-10 rounded-xl ${colors.bg} border ${colors.border} flex items-center justify-center mb-4`}
+              <MotionItem key={point.title}>
+                <motion.div
+                  whileHover={{ y: -4, transition: { duration: 0.25 } }}
+                  className={cn(
+                    "group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.03] transition-all duration-300 h-full",
+                    colors.hover
+                  )}
                 >
-                  <Icon size={18} className={colors.text} strokeWidth={1.4} />
-                </div>
-                <h3 className="font-display font-bold text-[15px] text-white mb-2 tracking-tight">
-                  {point.title}
-                </h3>
-                <p className="text-[13px] text-ghost leading-relaxed">
-                  {point.description}
-                </p>
-              </div>
+                  <div className={cn("w-10 h-10 rounded-xl border flex items-center justify-center mb-4", colors.iconBg)}>
+                    <Icon size={18} className={colors.iconColor} strokeWidth={1.4} />
+                  </div>
+                  <h3 className="font-display font-bold text-[15px] text-white mb-2 tracking-tight">
+                    {point.title}
+                  </h3>
+                  <p className="text-[13px] text-ghost leading-relaxed">
+                    {point.description}
+                  </p>
+                </motion.div>
+              </MotionItem>
             );
           })}
-        </div>
+        </Stagger>
       </div>
     </section>
   );

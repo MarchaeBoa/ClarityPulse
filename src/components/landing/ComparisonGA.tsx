@@ -1,4 +1,8 @@
+"use client";
+
 import { Check, X, Minus } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal } from "./motion";
 
 type Status = "yes" | "no" | "partial";
 
@@ -57,7 +61,7 @@ export default function ComparisonGA() {
 
       <div className="max-w-[1000px] mx-auto px-6">
         {/* Section header */}
-        <div className="max-w-2xl mx-auto text-center mb-16">
+        <Reveal className="max-w-2xl mx-auto text-center mb-16">
           <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
             Comparação
           </span>
@@ -69,46 +73,53 @@ export default function ComparisonGA() {
             Não é sobre ser contra o Google. É sobre ter uma alternativa que
             prioriza privacidade, simplicidade e dados reais.
           </p>
-        </div>
+        </Reveal>
 
         {/* Comparison table */}
-        <div className="rounded-2xl bg-surface border border-white/[0.06] overflow-hidden">
-          {/* Table header */}
-          <div className="grid grid-cols-[1fr_140px_140px] md:grid-cols-[1fr_180px_180px] items-center px-5 py-4 border-b border-white/[0.06] bg-white/[0.01]">
-            <span className="text-[10px] font-mono text-ghost/40 uppercase tracking-wider">
-              Funcionalidade
-            </span>
-            <div className="text-center">
-              <span className="text-[12px] font-display font-bold text-jade">ClarityPulse</span>
+        <Reveal delay={0.1}>
+          <div className="rounded-2xl bg-surface border border-white/[0.06] overflow-hidden">
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_140px_140px] md:grid-cols-[1fr_180px_180px] items-center px-5 py-4 border-b border-white/[0.06] bg-white/[0.01]">
+              <span className="text-[10px] font-mono text-ghost/40 uppercase tracking-wider">
+                Funcionalidade
+              </span>
+              <div className="text-center">
+                <span className="text-[12px] font-display font-bold text-jade">ClarityPulse</span>
+              </div>
+              <div className="text-center">
+                <span className="text-[12px] font-display font-bold text-ghost/40">GA4</span>
+              </div>
             </div>
-            <div className="text-center">
-              <span className="text-[12px] font-display font-bold text-ghost/40">GA4</span>
-            </div>
+
+            {/* Table rows */}
+            {comparisons.map((row, i) => (
+              <motion.div
+                key={row.feature}
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.03, duration: 0.4 }}
+                className={`grid grid-cols-[1fr_140px_140px] md:grid-cols-[1fr_180px_180px] items-center px-5 py-3.5 ${
+                  i !== comparisons.length - 1 ? "border-b border-white/[0.04]" : ""
+                } hover:bg-white/[0.01] transition-colors`}
+              >
+                <span className="text-[13px] text-ghost">{row.feature}</span>
+                <div className="flex justify-center">
+                  <StatusIcon status={row.clarity} note={row.clarityNote} />
+                </div>
+                <div className="flex justify-center">
+                  <StatusIcon status={row.ga4} note={row.gaNote} />
+                </div>
+              </motion.div>
+            ))}
           </div>
+        </Reveal>
 
-          {/* Table rows */}
-          {comparisons.map((row, i) => (
-            <div
-              key={row.feature}
-              className={`grid grid-cols-[1fr_140px_140px] md:grid-cols-[1fr_180px_180px] items-center px-5 py-3.5 ${
-                i !== comparisons.length - 1 ? "border-b border-white/[0.04]" : ""
-              } hover:bg-white/[0.01] transition-colors`}
-            >
-              <span className="text-[13px] text-ghost">{row.feature}</span>
-              <div className="flex justify-center">
-                <StatusIcon status={row.clarity} note={row.clarityNote} />
-              </div>
-              <div className="flex justify-center">
-                <StatusIcon status={row.ga4} note={row.gaNote} />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom note */}
-        <p className="text-center text-[11px] font-mono text-ghost/30 mt-6">
-          Comparação baseada em funcionalidades públicas. Atualizado em Abril 2026.
-        </p>
+        <Reveal delay={0.2}>
+          <p className="text-center text-[11px] font-mono text-ghost/30 mt-6">
+            Comparação baseada em funcionalidades públicas. Atualizado em Abril 2026.
+          </p>
+        </Reveal>
       </div>
     </section>
   );

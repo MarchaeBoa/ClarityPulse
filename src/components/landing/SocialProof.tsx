@@ -1,38 +1,63 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { Reveal } from "./motion";
+
+const logos = [
+  "Lumino", "Vexor", "Arcline", "Nuvem",
+  "Praxis", "Synthex", "Modular", "Clearbit",
+];
+
+function LogoItem({ name }: { name: string }) {
+  return (
+    <div className="flex items-center gap-2 shrink-0 px-6">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <rect width="20" height="20" rx="4" fill="white" fillOpacity="0.08" />
+        <circle cx="10" cy="10" r="4" stroke="white" strokeOpacity="0.3" strokeWidth="1.2" />
+      </svg>
+      <span className="font-display font-semibold text-[14px] text-white/30 tracking-tight whitespace-nowrap">
+        {name}
+      </span>
+    </div>
+  );
+}
+
 export default function SocialProof() {
-  const logos = [
-    { name: "Lumino", width: "w-20" },
-    { name: "Vexor", width: "w-16" },
-    { name: "Arcline", width: "w-20" },
-    { name: "Nuvem", width: "w-18" },
-    { name: "Praxis", width: "w-16" },
-    { name: "Synthex", width: "w-20" },
-    { name: "Modular", width: "w-18" },
-    { name: "Clearbit", width: "w-20" },
-  ];
+  const allLogos = [...logos, ...logos];
 
   return (
-    <section className="relative py-16 border-y border-white/[0.04]">
+    <section className="relative py-16 border-y border-white/[0.04] overflow-hidden">
       <div className="max-w-[1200px] mx-auto px-6">
-        <p className="text-center text-[11px] font-mono text-ghost/40 uppercase tracking-[0.15em] mb-10">
-          Empresas que escolheram clareza sobre complexidade
-        </p>
+        <Reveal>
+          <p className="text-center text-[11px] font-mono text-ghost/40 uppercase tracking-[0.15em] mb-10">
+            Empresas que escolheram clareza sobre complexidade
+          </p>
+        </Reveal>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
-          {logos.map((logo) => (
-            <div
-              key={logo.name}
-              className="flex items-center gap-2 opacity-30 hover:opacity-50 transition-opacity duration-300"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect width="20" height="20" rx="4" fill="white" fillOpacity="0.08" />
-                <circle cx="10" cy="10" r="4" stroke="white" strokeOpacity="0.3" strokeWidth="1.2" />
-              </svg>
-              <span className="font-display font-semibold text-[14px] text-white tracking-tight">
-                {logo.name}
-              </span>
-            </div>
+      {/* Infinite marquee */}
+      <div className="relative">
+        {/* Left fade */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-ink to-transparent z-10 pointer-events-none" />
+        {/* Right fade */}
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-ink to-transparent z-10 pointer-events-none" />
+
+        <motion.div
+          className="flex items-center"
+          animate={{ x: [0, -(logos.length * 160)] }}
+          transition={{
+            x: {
+              repeat: Infinity,
+              repeatType: "loop",
+              duration: 30,
+              ease: "linear",
+            },
+          }}
+        >
+          {allLogos.map((name, i) => (
+            <LogoItem key={`${name}-${i}`} name={name} />
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

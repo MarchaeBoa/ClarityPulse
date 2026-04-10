@@ -1,4 +1,8 @@
+"use client";
+
 import { Sparkles, TrendingUp, AlertCircle, Lightbulb } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal, Stagger, MotionItem } from "./motion";
 
 const insights = [
   {
@@ -44,48 +48,53 @@ export default function AIInsights() {
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-start">
           {/* Left — Insight cards */}
-          <div className="order-2 lg:order-1 flex flex-col gap-4">
+          <Stagger slow className="order-2 lg:order-1 flex flex-col gap-4">
             {insights.map((insight) => {
               const Icon = insight.icon;
               return (
-                <div
-                  key={insight.title}
-                  className="p-5 rounded-2xl bg-surface border border-white/[0.06] hover:border-white/[0.1] transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-6 h-6 rounded-md ${insight.typeBg} flex items-center justify-center`}>
-                        <Icon size={12} className={insight.typeColor} strokeWidth={1.6} />
+                <MotionItem key={insight.title}>
+                  <motion.div
+                    whileHover={{ x: 4, transition: { duration: 0.2 } }}
+                    className="p-5 rounded-2xl bg-surface border border-white/[0.06] hover:border-white/[0.1] transition-all duration-300"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded-md ${insight.typeBg} flex items-center justify-center`}>
+                          <Icon size={12} className={insight.typeColor} strokeWidth={1.6} />
+                        </div>
+                        <span className={`text-[10px] font-mono font-medium uppercase tracking-wider ${insight.typeColor}`}>
+                          {insight.type}
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-mono font-medium uppercase tracking-wider ${insight.typeColor}`}>
-                        {insight.type}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-12 bg-white/[0.04] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-jade/40 rounded-full"
-                          style={{ width: `${insight.confidence}%` }}
-                        />
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-12 bg-white/[0.04] rounded-full overflow-hidden">
+                          <motion.div
+                            className="h-full bg-jade/40 rounded-full"
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${insight.confidence}%` }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 1, delay: 0.3 }}
+                          />
+                        </div>
+                        <span className="text-[9px] font-mono text-ghost/40">{insight.confidence}%</span>
                       </div>
-                      <span className="text-[9px] font-mono text-ghost/40">{insight.confidence}%</span>
                     </div>
-                  </div>
 
-                  <h4 className="font-display font-bold text-[14px] text-white mb-2 tracking-tight">
-                    {insight.title}
-                  </h4>
-                  <p className="text-[12px] text-ghost leading-relaxed mb-3">
-                    {insight.description}
-                  </p>
-                  <span className="text-[10px] font-mono text-ghost/30">{insight.time}</span>
-                </div>
+                    <h4 className="font-display font-bold text-[14px] text-white mb-2 tracking-tight">
+                      {insight.title}
+                    </h4>
+                    <p className="text-[12px] text-ghost leading-relaxed mb-3">
+                      {insight.description}
+                    </p>
+                    <span className="text-[10px] font-mono text-ghost/30">{insight.time}</span>
+                  </motion.div>
+                </MotionItem>
               );
             })}
-          </div>
+          </Stagger>
 
           {/* Right — Copy */}
-          <div className="order-1 lg:order-2 lg:sticky lg:top-32">
+          <Reveal direction="right" className="order-1 lg:order-2 lg:sticky lg:top-32">
             <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
               Inteligência Artificial
             </span>
@@ -133,7 +142,7 @@ export default function AIInsights() {
                 );
               })}
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>
