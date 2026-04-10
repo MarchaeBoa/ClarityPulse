@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 const navLinks = [
   { label: "Produto", href: "#beneficios" },
   { label: "Dashboard", href: "#dashboard-preview" },
-  { label: "Integrações", href: "#integracoes" },
   { label: "Pricing", href: "#pricing" },
+  { label: "FAQ", href: "#faq" },
   { label: "Docs", href: "#" },
 ];
 
@@ -29,7 +29,9 @@ export default function Header() {
     } else {
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
   return (
@@ -40,14 +42,14 @@ export default function Header() {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-500",
         scrolled
-          ? "bg-ink/80 backdrop-blur-2xl border-b border-white/[0.06] shadow-[0_1px_24px_rgba(0,0,0,0.25)]"
+          ? "bg-ink/70 backdrop-blur-2xl border-b border-white/[0.06] shadow-[0_1px_40px_rgba(0,0,0,0.3)]"
           : "bg-transparent"
       )}
     >
-      <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-[1200px] mx-auto px-6 h-[64px] flex items-center justify-between">
         {/* Logo */}
-        <a href="#" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-jade/10 border border-jade/20 flex items-center justify-center group-hover:bg-jade/15 group-hover:border-jade/30 transition-all duration-300">
+        <a href="#" className="flex items-center gap-2.5 group relative z-10">
+          <div className="w-8 h-8 rounded-lg bg-jade/10 border border-jade/20 flex items-center justify-center group-hover:bg-jade/15 group-hover:border-jade/30 transition-all duration-300 group-hover:shadow-[0_0_20px_rgba(26,229,160,0.15)]">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path
                 d="M8 1L14.5 4.75V12.25L8 16L1.5 12.25V4.75L8 1Z"
@@ -64,7 +66,7 @@ export default function Header() {
         </a>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link, i) => (
             <motion.a
               key={link.label}
@@ -72,16 +74,16 @@ export default function Header() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + i * 0.06, duration: 0.4 }}
-              className="relative text-[13px] text-ghost hover:text-white transition-colors duration-200 group"
+              className="relative text-[13px] text-ghost hover:text-white transition-colors duration-200 px-3 py-2 rounded-lg hover:bg-white/[0.04] group"
             >
               {link.label}
-              <span className="absolute -bottom-1 left-0 w-0 h-px bg-jade group-hover:w-full transition-all duration-300" />
+              <span className="absolute bottom-1 left-3 right-3 h-px bg-jade scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
             </motion.a>
           ))}
         </nav>
 
         {/* Desktop CTAs */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3 relative z-10">
           <motion.a
             href="#"
             initial={{ opacity: 0 }}
@@ -98,11 +100,22 @@ export default function Header() {
             transition={{ delay: 0.6, type: "spring", stiffness: 200 }}
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-jade text-ink font-medium text-[13px] hover:bg-jade-hover transition-colors duration-200 shadow-[0_0_20px_rgba(26,229,160,0.15)]"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-jade text-ink font-semibold text-[13px] hover:bg-jade-hover transition-all duration-200 shadow-[0_0_20px_rgba(26,229,160,0.15),inset_0_1px_0_rgba(255,255,255,0.15)]"
           >
-            Comece grátis
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M5.5 3.5L9.5 7L5.5 10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            Comece gratis
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+            >
+              <path
+                d="M5.5 3.5L9.5 7L5.5 10.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </motion.a>
         </div>
@@ -110,16 +123,28 @@ export default function Header() {
         {/* Mobile Menu Toggle */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden text-ghost hover:text-white transition-colors p-1 relative z-50"
+          className="md:hidden text-ghost hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/[0.04] relative z-50"
           aria-label="Toggle menu"
         >
           <AnimatePresence mode="wait">
             {mobileOpen ? (
-              <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <motion.div
+                key="close"
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
                 <X size={20} />
               </motion.div>
             ) : (
-              <motion.div key="menu" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.2 }}>
+              <motion.div
+                key="menu"
+                initial={{ rotate: 90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: -90, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+              >
                 <Menu size={20} />
               </motion.div>
             )}
@@ -161,9 +186,9 @@ export default function Header() {
               </a>
               <a
                 href="#pricing"
-                className="text-center px-4 py-2.5 rounded-xl bg-jade text-ink font-medium text-[14px] hover:bg-jade-hover transition-colors"
+                className="text-center px-4 py-2.5 rounded-xl bg-jade text-ink font-semibold text-[14px] hover:bg-jade-hover transition-colors"
               >
-                Comece grátis
+                Comece gratis
               </a>
             </div>
           </motion.div>

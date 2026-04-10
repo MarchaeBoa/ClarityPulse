@@ -81,9 +81,9 @@ function cleanupDedup() {
   lastDedupCleanup = now;
 
   const cutoff = now - DEDUP_WINDOW;
-  for (const [key, ts] of dedupMap) {
+  dedupMap.forEach((ts, key) => {
     if (ts < cutoff) dedupMap.delete(key);
-  }
+  });
 }
 
 function checkRateLimit(ip: string): boolean {

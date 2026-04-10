@@ -9,7 +9,7 @@ import { buildCheckoutConfig } from "@/lib/billing/stripe";
 import { PURCHASABLE_PLANS, type PlanSlug, type BillingCycle } from "@/lib/billing/plans";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2026-03-25.dahlia",
 });
 
 export async function POST(req: NextRequest) {
