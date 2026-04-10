@@ -1,11 +1,25 @@
+"use client";
+
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
+import { Reveal, Stagger, MotionItem } from "./motion";
+
 export default function DashboardPreview() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "center center"],
+  });
+  const scale = useTransform(scrollYProgress, [0, 1], [0.88, 1]);
+  const opacity = useTransform(scrollYProgress, [0, 0.4], [0, 1]);
+
   return (
-    <section id="dashboard-preview" className="relative py-24 lg:py-32 overflow-hidden">
+    <section id="dashboard-preview" ref={sectionRef} className="relative py-24 lg:py-32 overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
 
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Section header */}
-        <div className="max-w-2xl mx-auto text-center mb-16">
+        <Reveal className="max-w-2xl mx-auto text-center mb-16">
           <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
             Preview
           </span>
@@ -18,14 +32,14 @@ export default function DashboardPreview() {
             3 cliques de distância. Projetado para product teams que tomam decisões
             rápidas.
           </p>
-        </div>
+        </Reveal>
 
         {/* Full Dashboard Mockup */}
-        <div className="relative">
+        <motion.div className="relative" style={{ scale, opacity }}>
           {/* Glow behind */}
           <div className="absolute inset-0 jade-glow rounded-3xl scale-[0.85] opacity-30" />
 
-          <div className="relative bg-surface rounded-2xl border border-white/[0.06] overflow-hidden shadow-2xl">
+          <div className="relative bg-surface rounded-2xl border border-white/[0.06] overflow-hidden shadow-2xl shadow-black/40">
             {/* Sidebar + Content Layout */}
             <div className="flex min-h-[500px]">
               {/* Sidebar */}
@@ -63,7 +77,7 @@ export default function DashboardPreview() {
                   ].map((item) => (
                     <div
                       key={item.label}
-                      className={`flex items-center gap-2.5 px-2.5 py-[6px] rounded-md text-[11.5px] ${
+                      className={`flex items-center gap-2.5 px-2.5 py-[6px] rounded-md text-[11.5px] transition-colors ${
                         item.active
                           ? "bg-jade/[0.08] text-white font-medium"
                           : "text-[#5A5E6B] hover:text-ghost"
@@ -119,7 +133,6 @@ export default function DashboardPreview() {
                           {kpi.change}
                         </span>
                       </div>
-                      {/* Mini sparkline */}
                       <div className="flex items-end gap-[2px] mt-3 h-6">
                         {[30, 40, 35, 50, 45, 55, 48, 60, 52, 65, 58, 70].map((h, i) => (
                           <div
@@ -135,7 +148,6 @@ export default function DashboardPreview() {
 
                 {/* Chart + Sources */}
                 <div className="grid lg:grid-cols-[1fr_280px] gap-3 px-4 pb-4">
-                  {/* Chart */}
                   <div className="bg-surface-2 rounded-xl p-4 border border-white/[0.03]">
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-[10px] font-mono text-ghost/50 uppercase tracking-wider">
@@ -156,14 +168,8 @@ export default function DashboardPreview() {
                       {[40, 45, 52, 48, 60, 55, 65, 58, 72, 68, 78, 74, 82, 76, 88, 85, 92, 80, 95, 90, 100, 96, 88, 94, 90, 86, 92, 88].map(
                         (h, i) => (
                           <div key={i} className="flex-1 flex flex-col gap-[1px]">
-                            <div
-                              className="rounded-t-sm bg-white/[0.05]"
-                              style={{ height: `${h * 0.4}px` }}
-                            />
-                            <div
-                              className="rounded-t-sm bg-jade"
-                              style={{ height: `${h * 0.8}px`, opacity: 0.2 + (i / 28) * 0.8 }}
-                            />
+                            <div className="rounded-t-sm bg-white/[0.05]" style={{ height: `${h * 0.4}px` }} />
+                            <div className="rounded-t-sm bg-jade" style={{ height: `${h * 0.8}px`, opacity: 0.2 + (i / 28) * 0.8 }} />
                           </div>
                         )
                       )}
@@ -195,10 +201,7 @@ export default function DashboardPreview() {
                             <span className="text-[11px] font-mono text-white">{s.visits}</span>
                           </div>
                           <div className="h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-jade/40 rounded-full"
-                              style={{ width: `${s.pct}%` }}
-                            />
+                            <div className="h-full bg-jade/40 rounded-full" style={{ width: `${s.pct}%` }} />
                           </div>
                         </div>
                       ))}
@@ -210,7 +213,7 @@ export default function DashboardPreview() {
           </div>
 
           {/* Feature callouts */}
-          <div className="grid md:grid-cols-3 gap-4 mt-8">
+          <Stagger className="grid md:grid-cols-3 gap-4 mt-8">
             {[
               {
                 title: "Realtime nativo",
@@ -225,20 +228,19 @@ export default function DashboardPreview() {
                 description: "Clique em qualquer fonte, página ou país para detalhar. Sem relatórios exploratórios.",
               },
             ].map((feature) => (
-              <div
-                key={feature.title}
-                className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.05]"
-              >
-                <h4 className="font-display font-bold text-[14px] text-white mb-2 tracking-tight">
-                  {feature.title}
-                </h4>
-                <p className="text-[12px] text-ghost leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
+              <MotionItem key={feature.title}>
+                <div className="p-5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-colors duration-300">
+                  <h4 className="font-display font-bold text-[14px] text-white mb-2 tracking-tight">
+                    {feature.title}
+                  </h4>
+                  <p className="text-[12px] text-ghost leading-relaxed">
+                    {feature.description}
+                  </p>
+                </div>
+              </MotionItem>
             ))}
-          </div>
-        </div>
+          </Stagger>
+        </motion.div>
       </div>
     </section>
   );

@@ -1,4 +1,8 @@
+"use client";
+
 import { Target, MousePointerClick, GitBranch, TrendingUp } from "lucide-react";
+import { motion } from "framer-motion";
+import { Reveal, Stagger, MotionItem } from "./motion";
 
 export default function EventsConversions() {
   return (
@@ -8,7 +12,7 @@ export default function EventsConversions() {
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left — Copy */}
-          <div>
+          <Reveal direction="left">
             <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
               Eventos & Conversões
             </span>
@@ -22,7 +26,7 @@ export default function EventsConversions() {
               tudo em tempo real.
             </p>
 
-            <div className="grid grid-cols-2 gap-4">
+            <Stagger className="grid grid-cols-2 gap-4">
               {[
                 { icon: Target, title: "Goals flexíveis", desc: "URL match, evento ou sequência de páginas" },
                 { icon: MousePointerClick, title: "Eventos custom", desc: "clarity('track', 'signup') — uma linha" },
@@ -31,21 +35,23 @@ export default function EventsConversions() {
               ].map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.title} className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                    <Icon size={18} className="text-jade mb-3" strokeWidth={1.4} />
-                    <h4 className="font-display font-bold text-[13px] text-white mb-1 tracking-tight">
-                      {item.title}
-                    </h4>
-                    <p className="text-[11px] text-ghost leading-relaxed">{item.desc}</p>
-                  </div>
+                  <MotionItem key={item.title}>
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-jade/15 transition-colors duration-300">
+                      <Icon size={18} className="text-jade mb-3" strokeWidth={1.4} />
+                      <h4 className="font-display font-bold text-[13px] text-white mb-1 tracking-tight">
+                        {item.title}
+                      </h4>
+                      <p className="text-[11px] text-ghost leading-relaxed">{item.desc}</p>
+                    </div>
+                  </MotionItem>
                 );
               })}
-            </div>
-          </div>
+            </Stagger>
+          </Reveal>
 
           {/* Right — Visual mockup */}
-          <div className="relative">
-            <div className="bg-surface rounded-2xl border border-white/[0.06] p-5 shadow-xl">
+          <Reveal direction="right">
+            <div className="bg-surface rounded-2xl border border-white/[0.06] p-5 shadow-xl shadow-black/30">
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div>
@@ -76,16 +82,19 @@ export default function EventsConversions() {
                         <span className="text-[12px] font-mono text-white">{s.value}</span>
                         {i > 0 && (
                           <span className="text-[10px] font-mono text-ember">
-                            -{(100 - s.pct)}%
+                            -{100 - s.pct}%
                           </span>
                         )}
                       </div>
                     </div>
                     <div className="h-8 bg-white/[0.02] rounded-lg overflow-hidden border border-white/[0.04]">
-                      <div
-                        className="h-full rounded-lg transition-all duration-700"
+                      <motion.div
+                        className="h-full rounded-lg"
+                        initial={{ width: 0 }}
+                        whileInView={{ width: `${s.pct}%` }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.8, delay: i * 0.1, ease: [0.25, 0.4, 0.25, 1] }}
                         style={{
-                          width: `${s.pct}%`,
                           background: `linear-gradient(90deg, rgba(26, 229, 160, ${0.15 + (s.pct / 100) * 0.25}), rgba(26, 229, 160, ${0.05 + (s.pct / 100) * 0.1}))`,
                         }}
                       />
@@ -110,7 +119,7 @@ export default function EventsConversions() {
                 </div>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

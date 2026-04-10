@@ -1,4 +1,7 @@
+"use client";
+
 import { FileText, Mail, Calendar, Download, Bell, Repeat } from "lucide-react";
+import { Reveal, Float, Stagger, MotionItem } from "./motion";
 
 export default function ReportsAutomation() {
   return (
@@ -8,9 +11,8 @@ export default function ReportsAutomation() {
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left — Mockup */}
-          <div className="relative">
-            {/* Email report mockup */}
-            <div className="bg-surface rounded-2xl border border-white/[0.06] p-6 shadow-xl">
+          <Reveal direction="left" className="relative">
+            <div className="bg-surface rounded-2xl border border-white/[0.06] p-6 shadow-xl shadow-black/30">
               {/* Email header */}
               <div className="flex items-center gap-3 mb-5 pb-4 border-b border-white/[0.05]">
                 <div className="w-8 h-8 rounded-lg bg-jade/10 border border-jade/20 flex items-center justify-center">
@@ -73,18 +75,20 @@ export default function ReportsAutomation() {
             </div>
 
             {/* Floating schedule badge */}
-            <div className="absolute -right-2 -bottom-4 bg-surface border border-white/[0.08] rounded-xl p-3 shadow-xl hidden md:block">
-              <div className="flex items-center gap-2">
-                <Calendar size={12} className="text-jade" />
-                <span className="text-[10px] font-mono text-ghost">
-                  Próximo envio: <span className="text-white">Segunda, 8:00</span>
-                </span>
+            <Float delay={1} duration={5} y={8}>
+              <div className="absolute -right-2 -bottom-4 bg-surface border border-white/[0.08] rounded-xl p-3 shadow-xl shadow-black/20 hidden md:block">
+                <div className="flex items-center gap-2">
+                  <Calendar size={12} className="text-jade" />
+                  <span className="text-[10px] font-mono text-ghost">
+                    Próximo envio: <span className="text-white">Segunda, 8:00</span>
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
+            </Float>
+          </Reveal>
 
           {/* Right — Copy */}
-          <div>
+          <Reveal direction="right">
             <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
               Relatórios & Automações
             </span>
@@ -98,7 +102,7 @@ export default function ReportsAutomation() {
               dados crus.
             </p>
 
-            <div className="grid grid-cols-2 gap-4">
+            <Stagger className="grid grid-cols-2 gap-4">
               {[
                 { icon: Mail, title: "Email semanal", desc: "Resumo com KPIs, top pages e insight IA" },
                 { icon: FileText, title: "PDF automático", desc: "Relatório completo pronto para compartilhar" },
@@ -109,19 +113,21 @@ export default function ReportsAutomation() {
               ].map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.title} className="flex gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
-                    <Icon size={16} className="text-jade shrink-0 mt-0.5" strokeWidth={1.4} />
-                    <div>
-                      <h4 className="font-display font-bold text-[12px] text-white mb-0.5 tracking-tight">
-                        {item.title}
-                      </h4>
-                      <p className="text-[11px] text-ghost leading-relaxed">{item.desc}</p>
+                  <MotionItem key={item.title}>
+                    <div className="flex gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] transition-colors duration-300">
+                      <Icon size={16} className="text-jade shrink-0 mt-0.5" strokeWidth={1.4} />
+                      <div>
+                        <h4 className="font-display font-bold text-[12px] text-white mb-0.5 tracking-tight">
+                          {item.title}
+                        </h4>
+                        <p className="text-[11px] text-ghost leading-relaxed">{item.desc}</p>
+                      </div>
                     </div>
-                  </div>
+                  </MotionItem>
                 );
               })}
-            </div>
-          </div>
+            </Stagger>
+          </Reveal>
         </div>
       </div>
     </section>

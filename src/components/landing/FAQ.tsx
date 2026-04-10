@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Reveal } from "./motion";
 
 const faqs = [
   {
@@ -56,34 +58,49 @@ const faqs = [
   },
 ];
 
-function FAQItem({ question, answer }: { question: string; answer: string }) {
+function FAQItem({ question, answer, index }: { question: string; answer: string; index: number }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-b border-white/[0.04] last:border-0">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: index * 0.04, duration: 0.4 }}
+      className="border-b border-white/[0.04] last:border-0"
+    >
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center justify-between w-full py-5 text-left group"
         aria-expanded={open}
       >
-        <span className="text-[14px] font-display font-semibold text-white pr-8 group-hover:text-jade transition-colors tracking-tight">
+        <span className="text-[14px] font-display font-semibold text-white pr-8 group-hover:text-jade transition-colors duration-200 tracking-tight">
           {question}
         </span>
-        <ChevronDown
-          size={16}
-          className={`text-ghost shrink-0 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
-        />
+        <motion.div
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.25 }}
+          className="shrink-0"
+        >
+          <ChevronDown size={16} className="text-ghost" />
+        </motion.div>
       </button>
-      <div
-        className={`overflow-hidden transition-all duration-300 ${
-          open ? "max-h-[500px] opacity-100 pb-5" : "max-h-0 opacity-0"
-        }`}
-      >
-        <p className="text-[13px] text-ghost leading-relaxed pr-12">{answer}</p>
-      </div>
-    </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.4, 0.25, 1] }}
+            className="overflow-hidden"
+          >
+            <p className="text-[13px] text-ghost leading-relaxed pr-12 pb-5">
+              {answer}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -94,7 +111,7 @@ export default function FAQ() {
 
       <div className="max-w-[720px] mx-auto px-6">
         {/* Section header */}
-        <div className="text-center mb-12">
+        <Reveal className="text-center mb-12">
           <span className="inline-block text-[11px] font-mono text-jade uppercase tracking-[0.15em] mb-4">
             FAQ
           </span>
@@ -104,22 +121,24 @@ export default function FAQ() {
           <p className="text-base text-ghost leading-relaxed">
             Tudo o que você precisa saber antes de começar.
           </p>
-        </div>
+        </Reveal>
 
         {/* FAQ items */}
         <div className="rounded-2xl bg-surface border border-white/[0.06] px-6">
-          {faqs.map((faq) => (
-            <FAQItem key={faq.question} question={faq.question} answer={faq.answer} />
+          {faqs.map((faq, i) => (
+            <FAQItem key={faq.question} question={faq.question} answer={faq.answer} index={i} />
           ))}
         </div>
 
         {/* Contact note */}
-        <p className="text-center text-[13px] text-ghost mt-8">
-          Não encontrou sua resposta?{" "}
-          <a href="#" className="text-jade hover:text-jade-hover transition-colors underline underline-offset-2">
-            Fale com nosso time
-          </a>
-        </p>
+        <Reveal delay={0.2}>
+          <p className="text-center text-[13px] text-ghost mt-8">
+            Não encontrou sua resposta?{" "}
+            <a href="#" className="text-jade hover:text-jade-hover transition-colors underline underline-offset-2">
+              Fale com nosso time
+            </a>
+          </p>
+        </Reveal>
       </div>
     </section>
   );
