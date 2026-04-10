@@ -20,6 +20,7 @@ import {
   Tag,
   Link2,
   X,
+  MessageSquareText,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -54,6 +55,7 @@ const navSections = [
       { name: "Events", href: "/dashboard/events", icon: MousePointerClick },
       { name: "Goals", href: "/dashboard/goals", icon: Target },
       { name: "AI Insights", href: "/dashboard/insights", icon: Sparkles },
+      { name: "Pulse AI", href: "/dashboard/pulse-ai", icon: MessageSquareText },
     ],
   },
 ];
