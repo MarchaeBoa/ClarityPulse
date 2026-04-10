@@ -1,5 +1,5 @@
 // ============================================================
-// ClarityPulse — TypeScript Tracking SDK
+// ClarityPulse — TypeScript Tracking SDK v2
 // For use in SPAs and TypeScript projects via npm
 //
 // Usage:
@@ -8,13 +8,19 @@
 //   trackEvent('signup_click', { plan: 'pro' });
 // ============================================================
 
-import type { ClarityPulseConfig, PageviewPayload, CustomEventPayload } from './types';
+import type {
+  ClarityPulseConfig,
+  PageviewPayload,
+  CustomEventPayload,
+  PageLeavePayload,
+  EventPayload,
+} from './types';
 
 // --- State ---
 let config: Required<ClarityPulseConfig> | null = null;
 let sessionId = '';
 let isFirstPageview = true;
-let lastPageviewUrl = '';
+let lastPageviewPath = '';
 let lastPageviewTime = 0;
 let previousPath = '';
 let utmParams: Record<string, string> = {};
@@ -25,12 +31,28 @@ const cleanupFns: Array<() => void> = [];
 
 // --- Constants ---
 const DEDUP_INTERVAL = 500;
+const FLUSH_INTERVAL = 2000;
+const MAX_BUFFER = 10;
 const DEFAULT_SENSITIVE_PARAMS = [
   'email', 'token', 'password', 'secret', 'key', 'auth',
   'access_token', 'refresh_token', 'api_key', 'apikey',
   'session_id', 'sessionid', 'credential',
 ];
 const DEFAULT_IGNORED_HOSTNAMES = ['localhost', '127.0.0.1', '0.0.0.0'];
+
+// --- Event Buffer ---
+let buffer: EventPayload[] = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+// --- Engagement ---
+let engagementStart = 0;
+let totalEngagement = 0;
+let isEngaged = false;
+let leaveSent = false;
+
+// --- Scroll depth ---
+let maxScrollDepth = 0;
+let scrollThrottle: ReturnType<typeof setTimeout> | null = null;
 
 // --- Utilities ---
 
@@ -90,10 +112,36 @@ function extractDomain(url: string): string {
   }
 }
 
-function send(payload: PageviewPayload | CustomEventPayload): void {
-  if (!config) return;
+function debug(...args: unknown[]): void {
+  if (config?.debug) {
+    console.log('[ClarityPulse]', ...args);
+  }
+}
 
-  const data = JSON.stringify(payload);
+// --- Event Buffer ---
+
+function flush(): void {
+  if (!config || buffer.length === 0) return;
+  const batch = buffer.splice(0);
+  sendBatch(batch);
+}
+
+function enqueue(payload: EventPayload): void {
+  buffer.push(payload);
+  if (buffer.length >= MAX_BUFFER) {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    flush();
+  } else if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      flush();
+    }, FLUSH_INTERVAL);
+  }
+}
+
+function sendBatch(events: EventPayload[]): void {
+  if (!config) return;
+  const data = JSON.stringify({ e: events, tk: config.siteToken });
 
   try {
     if (navigator.sendBeacon) {
@@ -116,19 +164,90 @@ function send(payload: PageviewPayload | CustomEventPayload): void {
   });
 }
 
-function debug(...args: unknown[]): void {
-  if (config?.debug) {
-    console.log('[ClarityPulse]', ...args);
+// --- Engagement ---
+
+function startEngagement(): void {
+  if (!isEngaged) {
+    engagementStart = Date.now();
+    isEngaged = true;
   }
+}
+
+function pauseEngagement(): void {
+  if (isEngaged) {
+    totalEngagement += Date.now() - engagementStart;
+    isEngaged = false;
+  }
+}
+
+function getEngagementTime(): number {
+  let total = totalEngagement;
+  if (isEngaged) total += Date.now() - engagementStart;
+  return Math.round(total / 1000);
+}
+
+function resetEngagement(): void {
+  totalEngagement = 0;
+  engagementStart = Date.now();
+  isEngaged = document.visibilityState !== 'hidden' && document.hasFocus();
+}
+
+// --- Scroll Depth ---
+
+function updateScrollDepth(): void {
+  const docHeight = Math.max(
+    document.body?.scrollHeight || 0,
+    document.documentElement?.scrollHeight || 0
+  );
+  const viewportHeight = window.innerHeight || 0;
+  const scrollable = docHeight - viewportHeight;
+  if (scrollable <= 0) {
+    maxScrollDepth = 100;
+    return;
+  }
+  const scrollTop = window.pageYOffset || document.documentElement?.scrollTop || 0;
+  const depth = Math.round((scrollTop / scrollable) * 100);
+  if (depth > maxScrollDepth) maxScrollDepth = Math.min(depth, 100);
+}
+
+// --- Page Leave ---
+
+function trackPageLeave(): void {
+  if (leaveSent) return;
+  leaveSent = true;
+
+  pauseEngagement();
+  const et = getEngagementTime();
+  if (et < 1) return;
+
+  const payload: PageLeavePayload = {
+    t: 'pl',
+    p: location.pathname,
+    et,
+    sd: maxScrollDepth,
+    ts: Date.now(),
+    sid: sessionId,
+  };
+
+  buffer.push(payload);
+  flush();
 }
 
 // --- SPA History observer ---
 
 function setupSPAObserver(): void {
+  const getPath = () => {
+    return location.pathname + (config?.hashRouting ? location.hash : '');
+  };
+
   const onNavigation = () => {
-    if (location.pathname === previousPath) return;
-    previousPath = location.pathname;
+    const newPath = getPath();
+    if (newPath === previousPath) return;
+
+    trackPageLeave();
+    previousPath = newPath;
     utmParams = parseUTM();
+
     if (!config?.manualPageviews) {
       trackPageview();
     }
@@ -140,7 +259,7 @@ function setupSPAObserver(): void {
 
   for (const method of methods) {
     originals[method] = history[method].bind(history);
-    (history as Record<string, unknown>)[method] = function (
+    (history as unknown as Record<string, unknown>)[method] = function (
       ...args: Parameters<typeof history.pushState>
     ) {
       const result = originals[method](...args);
@@ -153,12 +272,49 @@ function setupSPAObserver(): void {
   const onPopState = () => setTimeout(onNavigation, 0);
   window.addEventListener('popstate', onPopState);
 
-  // Cleanup function
+  // Hash change (if hash routing enabled)
+  const onHashChange = () => setTimeout(onNavigation, 0);
+  if (config?.hashRouting) {
+    window.addEventListener('hashchange', onHashChange);
+  }
+
+  // Scroll tracking
+  const onScroll = () => {
+    if (!scrollThrottle) {
+      scrollThrottle = setTimeout(() => {
+        scrollThrottle = null;
+        updateScrollDepth();
+      }, 200);
+    }
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+
+  // Visibility & focus
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') {
+      trackPageLeave();
+    } else {
+      leaveSent = false;
+      startEngagement();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('focus', startEngagement);
+  window.addEventListener('blur', pauseEngagement);
+  window.addEventListener('pagehide', trackPageLeave);
+
+  // Cleanup
   cleanupFns.push(() => {
     for (const method of methods) {
-      (history as Record<string, unknown>)[method] = originals[method];
+      (history as unknown as Record<string, unknown>)[method] = originals[method];
     }
     window.removeEventListener('popstate', onPopState);
+    window.removeEventListener('hashchange', onHashChange);
+    window.removeEventListener('scroll', onScroll);
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('focus', startEngagement);
+    window.removeEventListener('blur', pauseEngagement);
+    window.removeEventListener('pagehide', trackPageLeave);
   });
 }
 
@@ -211,10 +367,20 @@ export function init(userConfig: ClarityPulseConfig): void {
     sensitiveParams: userConfig.sensitiveParams ?? DEFAULT_SENSITIVE_PARAMS,
     manualPageviews: userConfig.manualPageviews ?? false,
     honorDNT: userConfig.honorDNT ?? true,
+    hashRouting: userConfig.hashRouting ?? false,
   };
 
-  sessionId = fnv1a(`${Date.now()}${Math.random()}`);
-  previousPath = location.pathname;
+  // Generate session ID (day-scoped, cookie-free)
+  const today = new Date().toISOString().substring(0, 10);
+  const fingerprint = [
+    screen.width, screen.height, screen.colorDepth,
+    navigator.language || '',
+    new Date().getTimezoneOffset(),
+    today,
+  ].join('|');
+  sessionId = fnv1a(fingerprint + String(Math.random()));
+
+  previousPath = location.pathname + (config.hashRouting ? location.hash : '');
   utmParams = parseUTM();
   initialized = true;
 
@@ -229,11 +395,13 @@ export function init(userConfig: ClarityPulseConfig): void {
       const onVisible = () => {
         if (document.visibilityState === 'visible') {
           document.removeEventListener('visibilitychange', onVisible);
+          startEngagement();
           trackPageview();
         }
       };
       document.addEventListener('visibilitychange', onVisible);
     } else {
+      startEngagement();
       trackPageview();
     }
   }
@@ -246,17 +414,22 @@ export function trackPageview(): void {
   if (!config) return;
 
   const now = Date.now();
-  const currentUrl = location.href;
+  const currentPath = location.pathname;
 
   // Dedup
-  if (currentUrl === lastPageviewUrl && now - lastPageviewTime < DEDUP_INTERVAL) {
+  if (currentPath === lastPageviewPath && now - lastPageviewTime < DEDUP_INTERVAL) {
     return;
   }
 
   if (document.visibilityState === 'hidden') return;
 
-  lastPageviewUrl = currentUrl;
+  lastPageviewPath = currentPath;
   lastPageviewTime = now;
+
+  // Reset engagement and scroll for new page
+  leaveSent = false;
+  resetEngagement();
+  maxScrollDepth = 0;
 
   let referrer = document.referrer;
   let referrerDomain = extractDomain(referrer);
@@ -269,9 +442,8 @@ export function trackPageview(): void {
 
   const payload: PageviewPayload = {
     t: 'pv',
-    tk: config.siteToken,
-    u: currentUrl.substring(0, 2048),
-    p: location.pathname,
+    u: location.href.substring(0, 2048),
+    p: currentPath,
     q: sanitizeQuery(location.search),
     vw: window.innerWidth || 0,
     vh: window.innerHeight || 0,
@@ -294,7 +466,7 @@ export function trackPageview(): void {
   isFirstPageview = false;
 
   debug('Pageview:', payload.p);
-  send(payload);
+  enqueue(payload);
 }
 
 /**
@@ -329,7 +501,6 @@ export function trackEvent(
 
   const payload: CustomEventPayload = {
     t: 'ev',
-    tk: config.siteToken,
     n: cleanName,
     u: location.href.substring(0, 2048),
     p: location.pathname,
@@ -342,17 +513,26 @@ export function trackEvent(
   }
 
   debug('Event:', cleanName, cleanProps);
-  send(payload);
+  enqueue(payload);
 }
 
 /**
  * Destroy the tracker and clean up all observers
  */
 export function destroy(): void {
+  // Flush remaining events
+  flush();
+
   for (const cleanup of cleanupFns) {
     cleanup();
   }
   cleanupFns.length = 0;
+
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
   config = null;
   initialized = false;
   debug('Destroyed');

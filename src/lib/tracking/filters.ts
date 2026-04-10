@@ -3,7 +3,7 @@
 // Server-side filtering to exclude bots, internal traffic, etc.
 // ============================================================
 
-import type { FilterContext } from './types';
+import type { FilterContext, InternalTrafficConfig } from './types';
 
 // Known bot User-Agent patterns
 const BOT_PATTERNS = [
@@ -137,6 +137,35 @@ export function truncateIP(ip: string): string {
   const parts = ip.split('.');
   if (parts.length !== 4) return '0.0.0.0';
   return `${parts[0]}.${parts[1]}.0.0`;
+}
+
+/**
+ * Check if a request is from internal traffic
+ * Uses configurable CIDR ranges and header-based detection
+ */
+export function isInternalTraffic(
+  ip: string,
+  headers: { get(name: string): string | null },
+  config: InternalTrafficConfig
+): boolean {
+  // Check CIDR ranges
+  if (config.blockedCIDRs.length > 0 && isBlockedIP(ip, config.blockedCIDRs)) {
+    return true;
+  }
+
+  // Check internal header (e.g., set by corporate VPN/proxy)
+  if (config.internalHeader) {
+    const headerValue = headers.get(config.internalHeader);
+    if (headerValue) {
+      // If a specific value is expected, match it; otherwise, any value means internal
+      if (config.internalHeaderValue) {
+        return headerValue === config.internalHeaderValue;
+      }
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
