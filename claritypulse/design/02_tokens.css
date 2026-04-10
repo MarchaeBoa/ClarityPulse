@@ -1,0 +1,240 @@
+/**
+ * ClarityPulse — Design Tokens
+ * Importar no globals.css do Next.js
+ * Versão: 1.0.0
+ */
+
+/* ============================================
+   FONTS
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&family=DM+Mono:wght@400;500&display=swap');
+
+/* ============================================
+   LIGHT MODE (default)
+   ============================================ */
+:root {
+  /* === Cores de Background === */
+  --bg-page:        #F7F8FA;
+  --bg-card:        #ffffff;
+  --bg-surface:     #EDEEF2;
+  --bg-surface-2:   #E2E4EA;
+  --bg-elevated:    #ffffff;
+  --bg-sidebar:     #111214;
+  --bg-input:       #ffffff;
+
+  /* === Cores de Texto === */
+  --text-primary:   #0A0B0D;
+  --text-secondary: #1C1E23;
+  --text-tertiary:  #2E3038;
+  --text-muted:     #9BA0AE;
+  --text-ghost:     #C4C7D0;
+  --text-disabled:  #D8DBE4;
+
+  /* === Bordas === */
+  --border-subtle:  rgba(0, 0, 0, 0.05);
+  --border:         rgba(0, 0, 0, 0.07);
+  --border-strong:  rgba(0, 0, 0, 0.11);
+  --border-focus:   #0FBF82;
+
+  /* === Accent — Jade (primário) === */
+  --jade:           #1AE5A0;
+  --jade-hover:     #0FBF82;
+  --jade-dark:      #0A9465;
+  --jade-tint:      #E6FDF5;
+  --jade-tint-2:    rgba(26, 229, 160, 0.08);
+
+  /* === Semânticas === */
+  --sapphire:       #3B7BF8;
+  --sapphire-tint:  #E8EFFF;
+  --ember:          #F5653A;
+  --ember-tint:     #FEF0EC;
+  --gold:           #F0A500;
+  --gold-tint:      #FEF6E4;
+
+  /* === Sombras === */
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:      0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg:      0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-focus:   0 0 0 3px rgba(26, 229, 160, 0.15);
+  --shadow-focus-danger: 0 0 0 3px rgba(245, 101, 58, 0.12);
+
+  /* === Border Radius === */
+  --r-micro:        4px;
+  --r-sm:           6px;
+  --r-base:         8px;
+  --r-card:         12px;
+  --r-panel:        16px;
+  --r-modal:        20px;
+  --r-pill:         999px;
+
+  /* === Spacing (base 4px) === */
+  --space-1:        4px;
+  --space-2:        8px;
+  --space-3:        12px;
+  --space-4:        16px;
+  --space-5:        20px;
+  --space-6:        24px;
+  --space-8:        32px;
+  --space-10:       40px;
+  --space-12:       48px;
+  --space-16:       64px;
+
+  /* === Typography === */
+  --font-display:   'Syne', -apple-system, sans-serif;
+  --font-body:      'DM Sans', -apple-system, sans-serif;
+  --font-mono:      'DM Mono', 'Fira Code', monospace;
+
+  /* === Z-Index === */
+  --z-dropdown:     100;
+  --z-sticky:       200;
+  --z-modal-bg:     300;
+  --z-modal:        400;
+  --z-toast:        500;
+  --z-tooltip:      600;
+
+  /* === Transitions === */
+  --ease-default:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in:        cubic-bezier(0.4, 0, 1, 1);
+  --ease-out:       cubic-bezier(0, 0, 0.2, 1);
+  --ease-spring:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast:  100ms;
+  --duration-base:  150ms;
+  --duration-slow:  300ms;
+  --duration-anim:  400ms;
+
+  /* === Sidebar === */
+  --sidebar-width:  200px;
+  --sidebar-bg:     #111214;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --nav-item-active-bg: rgba(26, 229, 160, 0.08);
+  --nav-item-hover-bg:  rgba(255, 255, 255, 0.04);
+  --nav-active-color:   #E8E9EC;
+  --nav-inactive-color: #5A5E6B;
+}
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+[data-theme="dark"] {
+  --bg-page:        #0A0B0D;
+  --bg-card:        #111214;
+  --bg-surface:     #1C1E23;
+  --bg-surface-2:   #222326;
+  --bg-elevated:    #131416;
+  --bg-input:       #1C1E23;
+
+  --text-primary:   #E8E9EC;
+  --text-secondary: #C4C7D0;
+  --text-tertiary:  #9BA0AE;
+  --text-muted:     #5A5E6B;
+  --text-ghost:     #3E4047;
+  --text-disabled:  #2E3038;
+
+  --border-subtle:  rgba(255, 255, 255, 0.04);
+  --border:         rgba(255, 255, 255, 0.06);
+  --border-strong:  rgba(255, 255, 255, 0.09);
+
+  --jade-tint:      rgba(26, 229, 160, 0.08);
+  --sapphire-tint:  rgba(59, 123, 248, 0.10);
+  --ember-tint:     rgba(245, 101, 58, 0.10);
+  --gold-tint:      rgba(240, 165, 0, 0.10);
+
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:      0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-lg:      0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   RESET E BASE
+   ============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background-color: var(--bg-page);
+  transition: background-color var(--duration-slow) var(--ease-default),
+              color var(--duration-slow) var(--ease-default);
+}
+
+/* ============================================
+   FOCUS GLOBAL
+   ============================================ */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+  border-radius: var(--r-base);
+}
+
+/* ============================================
+   SKELETON LOADING
+   ============================================ */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1.0; }
+}
+
+.skeleton {
+  background: var(--bg-surface);
+  border-radius: var(--r-micro);
+  animation: shimmer 1.4s ease infinite;
+}
+
+/* ============================================
+   SCROLLBAR CUSTOMIZADA
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-ghost);
+}
+
+/* ============================================
+   UTILITÁRIOS
+   ============================================ */
+.font-display { font-family: var(--font-display); }
+.font-body    { font-family: var(--font-body); }
+.font-mono    { font-family: var(--font-mono); }
+
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
+.text-jade      { color: var(--jade-dark); }
+.text-sapphire  { color: var(--sapphire); }
+.text-ember     { color: var(--ember); }
+
+.bg-card    { background: var(--bg-card); }
+.bg-surface { background: var(--bg-surface); }
+
+/* ============================================
+   PREFERS-REDUCED-MOTION
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
