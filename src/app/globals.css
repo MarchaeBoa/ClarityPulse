@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   DESIGN TOKENS — ClarityPulse
+   ============================================ */
+:root {
+  --bg-page:        #F7F8FA;
+  --bg-card:        #ffffff;
+  --bg-surface:     #EDEEF2;
+  --bg-surface-2:   #E2E4EA;
+  --bg-elevated:    #ffffff;
+  --bg-input:       #ffffff;
+
+  --text-primary:   #0A0B0D;
+  --text-secondary: #1C1E23;
+  --text-tertiary:  #2E3038;
+  --text-muted:     #9BA0AE;
+  --text-ghost:     #C4C7D0;
+
+  --border-subtle:  rgba(0, 0, 0, 0.05);
+  --border:         rgba(0, 0, 0, 0.07);
+  --border-strong:  rgba(0, 0, 0, 0.11);
+
+  --jade:           #1AE5A0;
+  --jade-hover:     #0FBF82;
+  --jade-dark:      #0A9465;
+  --jade-tint:      #E6FDF5;
+
+  --sapphire:       #3B7BF8;
+  --ember:          #F5653A;
+  --gold:           #F0A500;
+
+  --shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:      0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg:      0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+
+  --ease-default:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:       cubic-bezier(0, 0, 0.2, 1);
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgba(26, 229, 160, 0.2);
+  color: #0A0B0D;
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   LANDING PAGE UTILITIES
+   ============================================ */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Gradient line separators */
+.gradient-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06) 20%, rgba(255, 255, 255, 0.06) 80%, transparent);
+}
+
+/* Glow effects */
+.jade-glow {
+  box-shadow: 0 0 60px rgba(26, 229, 160, 0.15), 0 0 120px rgba(26, 229, 160, 0.05);
+}
+
+.jade-glow-subtle {
+  box-shadow: 0 0 40px rgba(26, 229, 160, 0.08);
+}
+
+/* Grid pattern background */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* Radial gradient for hero */
+.hero-gradient {
+  background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(26, 229, 160, 0.08), transparent);
+}
+
+/* Dashboard mockup 3D perspective */
+.dashboard-perspective {
+  transform: perspective(1200px) rotateY(-4deg) rotateX(2deg);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-perspective:hover {
+  transform: perspective(1200px) rotateY(-2deg) rotateX(1deg);
+}
+
+/* Smooth fade for sections */
+.section-fade {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+
+.section-fade.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Comparison table checkmark */
+.check-jade {
+  color: #1AE5A0;
+}
+.check-muted {
+  color: #3E4047;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
