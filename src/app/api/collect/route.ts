@@ -5,26 +5,34 @@
 // Receives events from the browser tracking script (cp.js)
 // and persists them to the database.
 //
+// Supports two payload formats:
+//   1. Batch (v2): { e: [...events], tk: "site_token" }
+//   2. Single (legacy): { t: "pv", tk: "token", ... }
+//
 // Privacy-first: no cookies, IP truncated, no personal data stored.
 //
-// MVP: Direct INSERT to PostgreSQL (Supabase)
-// Future: Publish to Kafka → Worker batch COPY
+// MVP: In-memory queue → console log
+// Production: Queue → Kafka → Workers → ClickHouse
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import type {
   PageviewPayload,
   CustomEventPayload,
+  PageLeavePayload,
   EventPayload,
+  BatchPayload,
   TokenCacheEntry,
+  InternalTrafficConfig,
 } from '@/lib/tracking/types';
 import {
   shouldBlockRequest,
-  isBlockedIP,
+  isInternalTraffic,
   parseUserAgent,
   truncateIP,
   fnv1a,
 } from '@/lib/tracking/filters';
+import { pushEvent } from '@/lib/tracking/queue';
 
 // --- CORS headers ---
 const CORS_HEADERS = {
@@ -41,17 +49,31 @@ const RATE_LIMIT_WINDOW = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 60; // max events per window per IP
 
 // --- Token cache (in-memory for MVP) ---
-// In production, this would be backed by Redis
 const tokenCache = new Map<string, TokenCacheEntry>();
 const TOKEN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // --- Dedup window (in-memory for MVP) ---
 const dedupMap = new Map<string, number>();
 const DEDUP_WINDOW = 5_000; // 5 seconds
-const DEDUP_CLEANUP_INTERVAL = 30_000; // cleanup every 30s
-
-// Periodic dedup cleanup
+const DEDUP_CLEANUP_INTERVAL = 30_000;
 let lastDedupCleanup = Date.now();
+
+// --- Internal traffic config (per-site in production, global for MVP) ---
+const internalTrafficConfig: InternalTrafficConfig = {
+  blockedCIDRs: [
+    // Common private ranges — customize per deployment
+    // '10.0.0.0/8',
+    // '172.16.0.0/12',
+    // '192.168.0.0/16',
+  ],
+  internalHeader: 'X-CP-Internal',
+  internalHeaderValue: 'true',
+};
+
+// --- Max events per batch ---
+const MAX_BATCH_SIZE = 20;
+
+// --- Helpers ---
 
 function cleanupDedup() {
   const now = Date.now();
@@ -63,8 +85,6 @@ function cleanupDedup() {
     if (ts < cutoff) dedupMap.delete(key);
   }
 }
-
-// --- Rate limiter ---
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -83,14 +103,9 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-// --- Token validation ---
-// MVP: Stub that accepts known test tokens
-// Production: Query sites table with cache
-
 async function validateToken(
   token: string
 ): Promise<TokenCacheEntry | null> {
-  // Check cache first
   const cached = tokenCache.get(token);
   if (cached && Date.now() - cached.cachedAt < TOKEN_CACHE_TTL) {
     return cached.isActive ? cached : null;
@@ -119,33 +134,30 @@ async function validateToken(
   return null;
 }
 
-// --- Payload validation ---
-
-function isValidPayload(body: unknown): body is EventPayload {
+function isValidEvent(body: unknown): body is EventPayload {
   if (!body || typeof body !== 'object') return false;
   const p = body as Record<string, unknown>;
 
-  // Required fields for all events
-  if (typeof p.t !== 'string' || !['pv', 'ev'].includes(p.t)) return false;
-  if (typeof p.tk !== 'string' || p.tk.length < 8 || p.tk.length > 64) return false;
-  if (typeof p.u !== 'string' || p.u.length > 2048) return false;
-  if (typeof p.p !== 'string' || p.p.length > 1024) return false;
+  if (typeof p.t !== 'string' || !['pv', 'ev', 'pl'].includes(p.t)) return false;
   if (typeof p.ts !== 'number') return false;
   if (typeof p.sid !== 'string' || p.sid.length > 32) return false;
 
   // Timestamp validation: must be within ±5 minutes of server time
-  const serverNow = Date.now();
-  const drift = Math.abs(serverNow - p.ts);
+  const drift = Math.abs(Date.now() - p.ts);
   if (drift > 5 * 60 * 1000) return false;
 
   // Pageview-specific validation
   if (p.t === 'pv') {
+    if (typeof p.u !== 'string' || p.u.length > 2048) return false;
+    if (typeof p.p !== 'string' || p.p.length > 1024) return false;
     if (typeof p.vw !== 'number' || typeof p.vh !== 'number') return false;
     if (p.uniq !== 0 && p.uniq !== 1) return false;
   }
 
   // Custom event-specific validation
   if (p.t === 'ev') {
+    if (typeof p.u !== 'string' || p.u.length > 2048) return false;
+    if (typeof p.p !== 'string' || p.p.length > 1024) return false;
     if (typeof p.n !== 'string' || p.n.length > 128) return false;
     if (p.pr !== undefined && p.pr !== null) {
       if (typeof p.pr !== 'object' || Array.isArray(p.pr)) return false;
@@ -160,16 +172,32 @@ function isValidPayload(body: unknown): body is EventPayload {
     }
   }
 
+  // Page leave-specific validation
+  if (p.t === 'pl') {
+    if (typeof p.p !== 'string' || p.p.length > 1024) return false;
+    if (typeof p.et !== 'number' || p.et < 0 || p.et > 86400) return false;
+    if (typeof p.sd !== 'number' || p.sd < 0 || p.sd > 100) return false;
+  }
+
   return true;
 }
 
-// --- Dedup check ---
+function isDuplicate(event: EventPayload): boolean {
+  let key: string;
 
-function isDuplicate(payload: EventPayload): boolean {
-  const key =
-    payload.t === 'pv'
-      ? `${payload.sid}:${payload.p}:pv`
-      : `${payload.sid}:${(payload as CustomEventPayload).n}:ev`;
+  switch (event.t) {
+    case 'pv':
+      key = `${event.sid}:${event.p}:pv`;
+      break;
+    case 'ev':
+      key = `${event.sid}:${(event as CustomEventPayload).n}:ev`;
+      break;
+    case 'pl':
+      key = `${event.sid}:${event.p}:pl`;
+      break;
+    default:
+      return false;
+  }
 
   const now = Date.now();
   const lastSeen = dedupMap.get(key);
@@ -180,119 +208,125 @@ function isDuplicate(payload: EventPayload): boolean {
   return false;
 }
 
-// --- Extract client IP from request ---
-
 function getClientIP(request: NextRequest): string {
-  // Standard proxy headers
   const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
+  if (forwarded) return forwarded.split(',')[0].trim();
   const realIp = request.headers.get('x-real-ip');
   if (realIp) return realIp.trim();
-
   return '0.0.0.0';
 }
-
-// --- Extract hostname from Origin or Referer ---
 
 function getRequestHostname(request: NextRequest): string {
   const origin = request.headers.get('origin');
   if (origin) {
-    try {
-      return new URL(origin).hostname;
-    } catch {
-      return '';
-    }
+    try { return new URL(origin).hostname; } catch { /* skip */ }
   }
   const referer = request.headers.get('referer');
   if (referer) {
-    try {
-      return new URL(referer).hostname;
-    } catch {
-      return '';
-    }
+    try { return new URL(referer).hostname; } catch { /* skip */ }
   }
   return '';
 }
 
-// --- Persist event ---
-// MVP: Logs to console (replace with Supabase INSERT)
+/**
+ * Parse request body into events array + site token.
+ * Handles both batch (v2) and single (legacy) formats.
+ */
+function parsePayload(body: unknown): { events: unknown[]; token: string } | null {
+  if (!body || typeof body !== 'object') return null;
 
-async function persistPageview(
-  payload: PageviewPayload,
-  siteId: string,
-  sessionHash: number,
-  device: ReturnType<typeof parseUserAgent>,
-  countryCode: string | null
-): Promise<void> {
-  // TODO: Replace with Supabase INSERT
-  // const { error } = await supabase.from('pageviews').insert({
-  //   site_id: siteId,
-  //   session_hash: sessionHash,
-  //   page_url: payload.u,
-  //   page_path: payload.p,
-  //   page_query: payload.q || null,
-  //   referrer: payload.r || null,
-  //   referrer_domain: payload.rd || null,
-  //   utm_source: payload.us || null,
-  //   utm_medium: payload.um || null,
-  //   utm_campaign: payload.uc || null,
-  //   utm_content: payload.un || null,
-  //   utm_term: payload.ut || null,
-  //   country_code: countryCode,
-  //   device_type: device.device_type,
-  //   os: device.os,
-  //   os_version: device.os_version,
-  //   browser: device.browser,
-  //   browser_version: device.browser_version,
-  //   viewport_width: payload.vw,
-  //   viewport_height: payload.vh,
-  //   is_entry: payload.uniq === 1,
-  //   occurred_at: new Date(payload.ts).toISOString(),
-  // });
+  const b = body as Record<string, unknown>;
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[ClarityPulse] Pageview:', {
-      site_id: siteId,
-      session_hash: sessionHash,
-      path: payload.p,
-      referrer: payload.rd || 'direct',
-      device: device.device_type,
-      browser: device.browser,
-      country: countryCode || 'unknown',
-      utm_source: payload.us || null,
-    });
+  // Batch format: { e: [...], tk: "token" }
+  if (Array.isArray(b.e) && typeof b.tk === 'string') {
+    if (b.e.length === 0 || b.e.length > MAX_BATCH_SIZE) return null;
+    return { events: b.e, token: b.tk };
   }
+
+  // Legacy single event format: { t: "pv", tk: "token", ... }
+  if (typeof b.t === 'string' && typeof b.tk === 'string') {
+    return { events: [b], token: b.tk };
+  }
+
+  return null;
 }
 
-async function persistCustomEvent(
-  payload: CustomEventPayload,
+// --- Process a single event ---
+
+function processEvent(
+  event: EventPayload,
   siteId: string,
   sessionHash: number,
   device: ReturnType<typeof parseUserAgent>,
   countryCode: string | null
-): Promise<void> {
-  // TODO: Replace with Supabase INSERT
-  // const { error } = await supabase.from('custom_events').insert({
-  //   site_id: siteId,
-  //   session_hash: sessionHash,
-  //   event_name: payload.n,
-  //   page_url: payload.u,
-  //   page_path: payload.p,
-  //   properties: payload.pr || null,
-  //   country_code: countryCode,
-  //   device_type: device.device_type,
-  //   occurred_at: new Date(payload.ts).toISOString(),
-  // });
-
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[ClarityPulse] Event:', {
+): void {
+  if (event.t === 'pv') {
+    const pv = event as PageviewPayload;
+    pushEvent(siteId, {
       site_id: siteId,
       session_hash: sessionHash,
-      name: payload.n,
-      properties: payload.pr,
-      path: payload.p,
+      event_type: 'pageview',
+      page_url: pv.u,
+      page_path: pv.p,
+      page_query: pv.q || undefined,
+      referrer: pv.r || undefined,
+      referrer_domain: pv.rd || undefined,
+      utm_source: pv.us || undefined,
+      utm_medium: pv.um || undefined,
+      utm_campaign: pv.uc || undefined,
+      utm_content: pv.un || undefined,
+      utm_term: pv.ut || undefined,
+      country_code: countryCode || undefined,
+      device_type: device.device_type,
+      os: device.os,
+      os_version: device.os_version,
+      browser: device.browser,
+      browser_version: device.browser_version,
+      viewport_width: pv.vw,
+      viewport_height: pv.vh,
+      is_entry: pv.uniq === 1,
+      is_unique: pv.uniq === 1,
+      occurred_at: new Date(pv.ts).toISOString(),
+    });
+  } else if (event.t === 'ev') {
+    const ev = event as CustomEventPayload;
+    pushEvent(siteId, {
+      site_id: siteId,
+      session_hash: sessionHash,
+      event_type: 'custom_event',
+      page_url: ev.u,
+      page_path: ev.p,
+      event_name: ev.n,
+      properties: ev.pr || undefined,
+      country_code: countryCode || undefined,
+      device_type: device.device_type,
+      os: device.os,
+      os_version: device.os_version,
+      browser: device.browser,
+      browser_version: device.browser_version,
+      is_entry: false,
+      is_unique: false,
+      occurred_at: new Date(ev.ts).toISOString(),
+    });
+  } else if (event.t === 'pl') {
+    const pl = event as PageLeavePayload;
+    pushEvent(siteId, {
+      site_id: siteId,
+      session_hash: sessionHash,
+      event_type: 'page_leave',
+      page_url: '',
+      page_path: pl.p,
+      engagement_time: pl.et,
+      scroll_depth: pl.sd,
+      country_code: countryCode || undefined,
+      device_type: device.device_type,
+      os: device.os,
+      os_version: device.os_version,
+      browser: device.browser,
+      browser_version: device.browser_version,
+      is_entry: false,
+      is_unique: false,
+      occurred_at: new Date(pl.ts).toISOString(),
     });
   }
 }
@@ -313,18 +347,13 @@ export async function OPTIONS() {
 // ============================================================
 
 export async function POST(request: NextRequest) {
-  // Always return 202 with CORS headers (even on error)
-  // This prevents leaking information about validation failures
   const accepted = () =>
     NextResponse.json(null, { status: 202, headers: CORS_HEADERS });
 
   const rateLimited = () =>
     NextResponse.json(null, {
       status: 429,
-      headers: {
-        ...CORS_HEADERS,
-        'Retry-After': '60',
-      },
+      headers: { ...CORS_HEADERS, 'Retry-After': '60' },
     });
 
   try {
@@ -337,60 +366,38 @@ export async function POST(request: NextRequest) {
       return rateLimited();
     }
 
-    // 3. Parse body
+    // 3. Check internal traffic
+    if (isInternalTraffic(clientIP, request.headers, internalTrafficConfig)) {
+      return accepted();
+    }
+
+    // 4. Parse body
     let body: unknown;
     try {
       body = await request.json();
     } catch {
-      return accepted(); // Silently reject malformed JSON
+      return accepted();
     }
 
-    // 4. Validate payload structure
-    if (!isValidPayload(body)) {
-      return accepted(); // Silently reject invalid payloads
-    }
+    // 5. Parse payload (batch or single)
+    const parsed = parsePayload(body);
+    if (!parsed) return accepted();
 
-    // 5. Validate site token
-    const site = await validateToken(body.tk);
-    if (!site) {
-      return accepted(); // Don't reveal if token exists
-    }
+    // 6. Validate site token
+    const site = await validateToken(parsed.token);
+    if (!site) return accepted();
 
-    // 6. Check Origin against allowed domains
+    // 7. Check Origin against allowed domains
     const requestHostname = getRequestHostname(request);
     if (
       site.allowedDomains.length > 0 &&
       !site.allowedDomains.includes(requestHostname)
     ) {
-      return accepted(); // Don't reveal allowed domains
+      return accepted();
     }
 
-    // 7. Run traffic filters
+    // 8. Parse User-Agent and compute session hash (once per request)
     const userAgent = request.headers.get('user-agent') || '';
-    const filterResult = shouldBlockRequest({
-      ip: clientIP,
-      hostname: requestHostname,
-      userAgent,
-      url: body.u,
-      viewportWidth: body.t === 'pv' ? body.vw : undefined,
-      viewportHeight: body.t === 'pv' ? body.vh : undefined,
-    });
-
-    if (filterResult.blocked) {
-      return accepted(); // Silently drop filtered traffic
-    }
-
-    // 8. Check blocked IPs
-    // TODO: Fetch blocked IPs from DB (cached)
-    // const blockedIPs = await getBlockedIPs(site.siteId);
-    // if (isBlockedIP(clientIP, blockedIPs)) return accepted();
-
-    // 9. Dedup check
-    if (isDuplicate(body)) {
-      return accepted(); // Silently drop duplicates
-    }
-
-    // 10. Enrich event
     const device = parseUserAgent(userAgent);
     const sessionHash = fnv1a(
       `${truncatedIP}|${userAgent}|${new Date().toISOString().substring(0, 10)}`
@@ -399,21 +406,42 @@ export async function POST(request: NextRequest) {
     // TODO: GeoIP lookup from truncated IP
     const countryCode: string | null = null;
 
-    // 11. Persist
-    if (body.t === 'pv') {
-      await persistPageview(body, site.siteId, sessionHash, device, countryCode);
-    } else if (body.t === 'ev') {
-      await persistCustomEvent(
-        body as CustomEventPayload,
-        site.siteId,
-        sessionHash,
-        device,
-        countryCode
-      );
+    // 9. Process each event in the batch
+    let processed = 0;
+    for (const rawEvent of parsed.events) {
+      // Validate event structure
+      if (!isValidEvent(rawEvent)) continue;
+
+      const event = rawEvent as EventPayload;
+
+      // Run traffic filters (for pageview events with viewport data)
+      if (event.t === 'pv') {
+        const pv = event as PageviewPayload;
+        const filterResult = shouldBlockRequest({
+          ip: clientIP,
+          hostname: requestHostname,
+          userAgent,
+          url: pv.u,
+          viewportWidth: pv.vw,
+          viewportHeight: pv.vh,
+        });
+        if (filterResult.blocked) continue;
+      }
+
+      // Dedup check
+      if (isDuplicate(event)) continue;
+
+      // Enrich and queue
+      processEvent(event, site.siteId, sessionHash, device, countryCode);
+      processed++;
     }
 
-    // 12. Periodic cleanup
+    // 10. Periodic dedup cleanup
     cleanupDedup();
+
+    if (process.env.NODE_ENV === 'development' && processed > 0) {
+      console.log(`[ClarityPulse] Processed ${processed}/${parsed.events.length} events`);
+    }
 
     return accepted();
   } catch (error) {

@@ -9,8 +9,6 @@
 export interface PageviewPayload {
   /** Event type: "pv" = pageview */
   t: 'pv';
-  /** Site public token */
-  tk: string;
   /** Full URL */
   u: string;
   /** URL path only */
@@ -47,8 +45,6 @@ export interface PageviewPayload {
 export interface CustomEventPayload {
   /** Event type: "ev" = custom event */
   t: 'ev';
-  /** Site public token */
-  tk: string;
   /** Event name */
   n: string;
   /** Event properties (max 10 keys, 256 chars per value) */
@@ -63,8 +59,38 @@ export interface CustomEventPayload {
   sid: string;
 }
 
+/** Page leave payload — sent when user leaves a page */
+export interface PageLeavePayload {
+  /** Event type: "pl" = page leave */
+  t: 'pl';
+  /** URL path */
+  p: string;
+  /** Engagement time in seconds */
+  et: number;
+  /** Max scroll depth percentage (0-100) */
+  sd: number;
+  /** Client timestamp (ms) */
+  ts: number;
+  /** Session ID */
+  sid: string;
+}
+
 /** Union of all event payloads */
-export type EventPayload = PageviewPayload | CustomEventPayload;
+export type EventPayload = PageviewPayload | CustomEventPayload | PageLeavePayload;
+
+/** Batch payload envelope — sent from browser to server */
+export interface BatchPayload {
+  /** Array of events */
+  e: EventPayload[];
+  /** Site public token */
+  tk: string;
+}
+
+/** Single event payload (legacy format, backwards compatible) */
+export interface LegacyEventPayload extends PageviewPayload {
+  /** Site public token (included per-event in legacy format) */
+  tk: string;
+}
 
 // --- Server-side enriched event ---
 
@@ -72,7 +98,7 @@ export type EventPayload = PageviewPayload | CustomEventPayload;
 export interface EnrichedEvent {
   site_id: string;
   session_hash: number;
-  event_type: 'pageview' | 'custom_event';
+  event_type: 'pageview' | 'custom_event' | 'page_leave';
 
   // Page
   page_url: string;
@@ -110,6 +136,10 @@ export interface EnrichedEvent {
   is_entry: boolean;
   is_unique: boolean;
 
+  // Engagement (from page_leave events)
+  engagement_time?: number;
+  scroll_depth?: number;
+
   // Custom event fields
   event_name?: string;
   properties?: Record<string, string | number | boolean>;
@@ -136,6 +166,8 @@ export interface ClarityPulseConfig {
   manualPageviews?: boolean;
   /** Respect Do Not Track header (default: true) */
   honorDNT?: boolean;
+  /** Enable hash-based routing support (default: false) */
+  hashRouting?: boolean;
 }
 
 // --- Token cache entry ---
@@ -168,4 +200,15 @@ export interface FilterContext {
   isWebdriver?: boolean;
   viewportWidth?: number;
   viewportHeight?: number;
+}
+
+// --- Internal traffic configuration ---
+
+export interface InternalTrafficConfig {
+  /** CIDR ranges to filter (e.g., ["10.0.0.0/8", "192.168.1.0/24"]) */
+  blockedCIDRs: string[];
+  /** Internal header name to check (e.g., "X-CP-Internal") */
+  internalHeader?: string;
+  /** Internal header expected value */
+  internalHeaderValue?: string;
 }

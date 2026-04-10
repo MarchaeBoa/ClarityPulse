@@ -1,6 +1,14 @@
 /**
- * ClarityPulse Tracking Script
+ * ClarityPulse Tracking Script v2
  * Privacy-first, cookie-free, lightweight analytics
+ *
+ * Features:
+ * - Event batching (reduces network calls by up to 10x)
+ * - Engagement time tracking (real time on page)
+ * - Scroll depth measurement
+ * - SPA-compatible (History API + hash routing)
+ * - No cookies, no PII collection
+ * - Do Not Track respected
  *
  * Usage:
  *   <script data-site="YOUR_TOKEN" src="https://cdn.claritypulse.io/cp.js" defer></script>
@@ -8,27 +16,28 @@
  * Custom events:
  *   window.claritypulse('event', 'signup_click', { plan: 'pro' });
  *
+ * Attributes:
+ *   data-site    — Required. Your site public token.
+ *   data-api     — API endpoint (default: /api/collect)
+ *   data-manual  — Disable automatic pageview tracking
+ *   data-hash    — Enable hash-based routing support
+ *
  * Size target: < 4kb gzipped
  */
 (function () {
   'use strict';
 
-  // --- Early exit conditions ---
   var w = window;
   var d = document;
   var n = navigator;
   var l = location;
 
-  // Don't track if page is prerendering
+  // --- Early exit conditions ---
   if (d.visibilityState === 'prerender') return;
-
-  // Respect Do Not Track
   if (n.doNotTrack === '1' || w.doNotTrack === '1') return;
-
-  // Don't track automated browsers
   if (n.webdriver) return;
 
-  // --- Find script config ---
+  // --- Script config ---
   var scriptEl = d.currentScript || d.querySelector('script[data-site]');
   if (!scriptEl) return;
 
@@ -37,19 +46,21 @@
 
   var apiUrl = scriptEl.getAttribute('data-api') || '/api/collect';
   var manualMode = scriptEl.hasAttribute('data-manual');
+  var hashMode = scriptEl.hasAttribute('data-hash');
 
   // --- Hostname filter ---
-  var ignoredHosts = ['localhost', '127.0.0.1', '0.0.0.0'];
   var hostname = l.hostname;
   if (
-    ignoredHosts.indexOf(hostname) !== -1 ||
-    hostname.endsWith('.local') ||
-    hostname.endsWith('.test')
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.slice(-6) === '.local' ||
+    hostname.slice(-5) === '.test'
   ) {
     return;
   }
 
-  // --- Ignore param check ---
+  // --- Ignore param ---
   if (l.search.indexOf('claritypulse_ignore=true') !== -1) return;
 
   // --- Sensitive query params to strip ---
@@ -59,11 +70,11 @@
     'session_id', 'sessionid', 'credential', 'ssn', 'credit_card'
   ];
 
-  // --- Utilities ---
+  // ================================================================
+  // Utilities
+  // ================================================================
 
-  /**
-   * Simple FNV-1a 32-bit hash for generating session IDs
-   */
+  /** FNV-1a 32-bit hash */
   function fnv1a(str) {
     var hash = 0x811c9dc5;
     for (var i = 0; i < str.length; i++) {
@@ -73,9 +84,7 @@
     return hash.toString(16);
   }
 
-  /**
-   * Strip sensitive parameters from a query string
-   */
+  /** Strip sensitive parameters from query string */
   function sanitizeQuery(search) {
     if (!search || search.length < 2) return '';
     try {
@@ -83,81 +92,104 @@
       var clean = [];
       for (var i = 0; i < params.length; i++) {
         var key = params[i].split('=')[0].toLowerCase();
-        var isSensitive = false;
+        var found = false;
         for (var j = 0; j < sensitiveParams.length; j++) {
-          if (key === sensitiveParams[j]) {
-            isSensitive = true;
-            break;
-          }
+          if (key === sensitiveParams[j]) { found = true; break; }
         }
-        if (!isSensitive) {
-          clean.push(params[i]);
-        }
+        if (!found) clean.push(params[i]);
       }
-      return clean.length > 0 ? '?' + clean.join('&') : '';
+      return clean.length ? '?' + clean.join('&') : '';
     } catch (e) {
       return '';
     }
   }
 
-  /**
-   * Parse UTM parameters from the current URL
-   */
+  /** Parse UTM parameters from current URL */
   function parseUTM() {
     var utm = {};
     try {
       var params = l.search.substring(1).split('&');
       for (var i = 0; i < params.length; i++) {
         var parts = params[i].split('=');
-        var key = decodeURIComponent(parts[0]);
-        var val = parts[1] ? decodeURIComponent(parts[1]) : '';
-        if (key === 'utm_source') utm.us = val;
-        else if (key === 'utm_medium') utm.um = val;
-        else if (key === 'utm_campaign') utm.uc = val;
-        else if (key === 'utm_content') utm.un = val;
-        else if (key === 'utm_term') utm.ut = val;
+        var k = decodeURIComponent(parts[0]);
+        var v = parts[1] ? decodeURIComponent(parts[1]) : '';
+        if (k === 'utm_source') utm.us = v;
+        else if (k === 'utm_medium') utm.um = v;
+        else if (k === 'utm_campaign') utm.uc = v;
+        else if (k === 'utm_content') utm.un = v;
+        else if (k === 'utm_term') utm.ut = v;
       }
-    } catch (e) {
-      // Silent fail
-    }
+    } catch (e) { /* silent */ }
     return utm;
   }
 
-  /**
-   * Extract domain from a URL
-   */
+  /** Extract domain from a URL */
   function extractDomain(url) {
     if (!url) return '';
     try {
-      // Handle protocol-relative URLs
-      if (url.indexOf('//') === 0) url = 'https:' + url;
       var a = d.createElement('a');
-      a.href = url;
+      a.href = url.indexOf('//') === 0 ? 'https:' + url : url;
       return a.hostname || '';
     } catch (e) {
       return '';
     }
   }
 
-  /**
-   * Send event data to the API endpoint
-   * Uses sendBeacon for reliability (survives page unload),
-   * falls back to fetch for broader compatibility
-   */
-  function send(payload) {
-    var data = JSON.stringify(payload);
+  // ================================================================
+  // Session Management (cookie-free, day-scoped)
+  // ================================================================
 
+  var today = new Date().toISOString().substring(0, 10);
+  var fingerprint = [
+    screen.width, screen.height, screen.colorDepth,
+    n.language || '',
+    new Date().getTimezoneOffset(),
+    today
+  ].join('|');
+  var sessionId = fnv1a(fingerprint + String(Math.random()));
+  var isFirstPageview = true;
+
+  // ================================================================
+  // Event Buffer (batching)
+  // ================================================================
+
+  var buffer = [];
+  var FLUSH_INTERVAL = 2000;
+  var MAX_BUFFER = 10;
+  var flushTimer = null;
+
+  function flush() {
+    if (!buffer.length) return;
+    var batch = buffer.splice(0, buffer.length);
+    sendBatch(batch);
+  }
+
+  function enqueue(payload) {
+    buffer.push(payload);
+    if (buffer.length >= MAX_BUFFER) {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      flush();
+    } else if (!flushTimer) {
+      flushTimer = setTimeout(function () {
+        flushTimer = null;
+        flush();
+      }, FLUSH_INTERVAL);
+    }
+  }
+
+  /** Send a batch of events. Fallback chain: sendBeacon → fetch → XHR */
+  function sendBatch(events) {
+    var data = JSON.stringify({ e: events, tk: siteToken });
+
+    // 1. sendBeacon (survives page unload)
     try {
       if (n.sendBeacon) {
         var blob = new Blob([data], { type: 'application/json' });
-        var queued = n.sendBeacon(apiUrl, blob);
-        if (queued) return;
+        if (n.sendBeacon(apiUrl, blob)) return;
       }
-    } catch (e) {
-      // sendBeacon failed, fall through to fetch
-    }
+    } catch (e) { /* fall through */ }
 
-    // Fallback: fetch with keepalive
+    // 2. fetch with keepalive
     try {
       fetch(apiUrl, {
         method: 'POST',
@@ -166,56 +198,124 @@
         keepalive: true,
         mode: 'cors',
         credentials: 'omit'
-      }).catch(function () {
-        // Silent fail — analytics should never break the site
-      });
+      }).catch(function () { /* silent */ });
     } catch (e) {
-      // Final fallback: XMLHttpRequest
+      // 3. XMLHttpRequest (final fallback)
       try {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', apiUrl, true);
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.send(data);
-      } catch (e2) {
-        // Completely give up — never throw
-      }
+      } catch (e2) { /* give up silently */ }
     }
   }
 
-  // --- Session management (in-memory only, no cookies) ---
+  // ================================================================
+  // Deduplication
+  // ================================================================
 
-  var sessionId = fnv1a(String(Date.now()) + String(Math.random()));
-  var isFirstPageview = true;
-
-  // --- Deduplication ---
-
-  var lastPageviewUrl = '';
+  var lastPageviewPath = '';
   var lastPageviewTime = 0;
-  var DEDUP_INTERVAL = 500; // ms — prevent double-fire in SPAs
+  var DEDUP_INTERVAL = 500;
 
-  // --- UTM (parsed once, cached) ---
+  // ================================================================
+  // UTM Cache
+  // ================================================================
 
   var utmParams = parseUTM();
 
-  // --- Core tracking functions ---
+  // ================================================================
+  // Engagement Time Tracking
+  // ================================================================
 
-  /**
-   * Track a pageview event
-   */
+  var engagementStart = 0;
+  var totalEngagement = 0;
+  var isEngaged = false;
+
+  function startEngagement() {
+    if (!isEngaged) {
+      engagementStart = Date.now();
+      isEngaged = true;
+    }
+  }
+
+  function pauseEngagement() {
+    if (isEngaged) {
+      totalEngagement += Date.now() - engagementStart;
+      isEngaged = false;
+    }
+  }
+
+  function getEngagementTime() {
+    var total = totalEngagement;
+    if (isEngaged) total += Date.now() - engagementStart;
+    return Math.round(total / 1000); // seconds
+  }
+
+  function resetEngagement() {
+    totalEngagement = 0;
+    engagementStart = Date.now();
+    isEngaged = d.visibilityState !== 'hidden' && d.hasFocus();
+  }
+
+  // ================================================================
+  // Scroll Depth Tracking
+  // ================================================================
+
+  var maxScrollDepth = 0;
+  var scrollThrottle = null;
+
+  function updateScrollDepth() {
+    var docHeight = Math.max(
+      d.body ? d.body.scrollHeight : 0,
+      d.documentElement ? d.documentElement.scrollHeight : 0
+    );
+    var viewportHeight = w.innerHeight || 0;
+    var scrollable = docHeight - viewportHeight;
+    if (scrollable <= 0) {
+      maxScrollDepth = 100;
+      return;
+    }
+    var scrollTop = w.pageYOffset || (d.documentElement ? d.documentElement.scrollTop : 0) || 0;
+    var depth = Math.round((scrollTop / scrollable) * 100);
+    if (depth > maxScrollDepth) maxScrollDepth = Math.min(depth, 100);
+  }
+
+  w.addEventListener('scroll', function () {
+    if (!scrollThrottle) {
+      scrollThrottle = setTimeout(function () {
+        scrollThrottle = null;
+        updateScrollDepth();
+      }, 200);
+    }
+  }, { passive: true });
+
+  // ================================================================
+  // Core Tracking
+  // ================================================================
+
+  var leaveSent = false;
+
+  /** Track a pageview event */
   function trackPageview() {
     var now = Date.now();
-    var currentUrl = l.href;
+    var currentPath = l.pathname;
 
-    // Dedup: same URL within 500ms
-    if (currentUrl === lastPageviewUrl && now - lastPageviewTime < DEDUP_INTERVAL) {
+    // Dedup: same path within 500ms
+    if (currentPath === lastPageviewPath && now - lastPageviewTime < DEDUP_INTERVAL) {
       return;
     }
 
     // Only track visible pages
     if (d.visibilityState === 'hidden') return;
 
-    lastPageviewUrl = currentUrl;
+    lastPageviewPath = currentPath;
     lastPageviewTime = now;
+
+    // Reset engagement and scroll for new page
+    leaveSent = false;
+    resetEngagement();
+    maxScrollDepth = 0;
 
     var referrer = d.referrer;
     var referrerDomain = extractDomain(referrer);
@@ -228,9 +328,8 @@
 
     var payload = {
       t: 'pv',
-      tk: siteToken,
-      u: currentUrl.substring(0, 2048),
-      p: l.pathname,
+      u: l.href.substring(0, 2048),
+      p: currentPath,
       q: sanitizeQuery(l.search),
       vw: w.innerWidth || 0,
       vh: w.innerHeight || 0,
@@ -239,7 +338,7 @@
       uniq: isFirstPageview ? 1 : 0
     };
 
-    // Add referrer (only on first pageview or external referrer)
+    // Add referrer only on first pageview or external referrer
     if (referrer && isFirstPageview) {
       payload.r = referrer.substring(0, 2048);
       payload.rd = referrerDomain;
@@ -253,13 +352,10 @@
     if (utmParams.ut) payload.ut = utmParams.ut;
 
     isFirstPageview = false;
-
-    send(payload);
+    enqueue(payload);
   }
 
-  /**
-   * Track a custom event
-   */
+  /** Track a custom event */
   function trackEvent(name, properties) {
     if (!name || typeof name !== 'string') return;
 
@@ -271,21 +367,17 @@
     if (properties && typeof properties === 'object') {
       cleanProps = {};
       var keys = Object.keys(properties);
-      var count = Math.min(keys.length, 10); // Max 10 properties
+      var count = Math.min(keys.length, 10);
       for (var i = 0; i < count; i++) {
-        var key = keys[i].substring(0, 64);
-        var val = properties[keys[i]];
-        if (typeof val === 'string') {
-          cleanProps[key] = val.substring(0, 256);
-        } else if (typeof val === 'number' || typeof val === 'boolean') {
-          cleanProps[key] = val;
-        }
+        var k = keys[i].substring(0, 64);
+        var v = properties[keys[i]];
+        if (typeof v === 'string') cleanProps[k] = v.substring(0, 256);
+        else if (typeof v === 'number' || typeof v === 'boolean') cleanProps[k] = v;
       }
     }
 
     var payload = {
       t: 'ev',
-      tk: siteToken,
       n: name,
       u: l.href.substring(0, 2048),
       p: l.pathname,
@@ -293,23 +385,46 @@
       sid: sessionId
     };
 
-    if (cleanProps) {
-      payload.pr = cleanProps;
-    }
-
-    send(payload);
+    if (cleanProps) payload.pr = cleanProps;
+    enqueue(payload);
   }
 
-  // --- SPA support: intercept History API ---
+  /** Track page leave with engagement time and scroll depth */
+  function trackPageLeave() {
+    if (leaveSent) return;
+    leaveSent = true;
 
-  var previousPath = l.pathname;
+    pauseEngagement();
+    var et = getEngagementTime();
+
+    // Don't track sub-second visits (likely bots or bounces with no interaction)
+    if (et < 1) return;
+
+    buffer.push({
+      t: 'pl',
+      p: l.pathname,
+      et: et,
+      sd: maxScrollDepth,
+      ts: Date.now(),
+      sid: sessionId
+    });
+    flush(); // Immediate flush — page may be closing
+  }
+
+  // ================================================================
+  // SPA Support: History API interception
+  // ================================================================
+
+  var previousPath = l.pathname + (hashMode ? l.hash : '');
 
   function onNavigation() {
-    // Check if path actually changed (ignore hash-only changes for non-hash routers)
-    if (l.pathname === previousPath && l.search === '') return;
-    previousPath = l.pathname;
+    var newPath = l.pathname + (hashMode ? l.hash : '');
+    if (newPath === previousPath) return;
 
-    // Re-parse UTMs on navigation (SPAs may add UTM params dynamically)
+    // Send page leave for the previous page
+    trackPageLeave();
+
+    previousPath = newPath;
     utmParams = parseUTM();
 
     if (!manualMode) {
@@ -318,20 +433,19 @@
   }
 
   // Monkey-patch pushState and replaceState
-  function patchHistoryMethod(method) {
+  function patchHistory(method) {
     var original = history[method];
     if (!original) return;
 
     history[method] = function () {
       var result = original.apply(this, arguments);
-      // Use setTimeout to let the browser update location first
       setTimeout(onNavigation, 0);
       return result;
     };
   }
 
-  patchHistoryMethod('pushState');
-  patchHistoryMethod('replaceState');
+  patchHistory('pushState');
+  patchHistory('replaceState');
 
   // Back/forward navigation
   w.addEventListener('popstate', function () {
@@ -339,27 +453,35 @@
   });
 
   // Hash-based routing support
-  w.addEventListener('hashchange', function () {
-    if (!manualMode) {
-      trackPageview();
-    }
-  });
+  if (hashMode) {
+    w.addEventListener('hashchange', function () {
+      setTimeout(onNavigation, 0);
+    });
+  }
 
-  // --- Visibility change: track when tab becomes visible again ---
-  // (Handles case where user opens link in background tab)
-
-  var pendingVisibilityPageview = false;
+  // ================================================================
+  // Visibility & Focus (engagement tracking + page leave)
+  // ================================================================
 
   d.addEventListener('visibilitychange', function () {
-    if (d.visibilityState === 'visible' && pendingVisibilityPageview) {
-      pendingVisibilityPageview = false;
-      if (!manualMode) {
-        trackPageview();
-      }
+    if (d.visibilityState === 'hidden') {
+      trackPageLeave();
+    } else {
+      // Tab came back — allow a new page leave to fire
+      leaveSent = false;
+      startEngagement();
     }
   });
 
-  // --- Public API ---
+  w.addEventListener('focus', startEngagement);
+  w.addEventListener('blur', pauseEngagement);
+
+  // pagehide covers tab close and navigation away (bfcache safe)
+  w.addEventListener('pagehide', trackPageLeave);
+
+  // ================================================================
+  // Public API
+  // ================================================================
 
   w.claritypulse = function (command, arg1, arg2) {
     switch (command) {
@@ -380,20 +502,29 @@
     }
   }
 
-  // --- Initial pageview ---
+  // ================================================================
+  // Initialization
+  // ================================================================
 
   function init() {
     if (d.visibilityState === 'hidden') {
-      pendingVisibilityPageview = true;
+      // Page opened in background — wait until visible
+      var onVisible = function () {
+        if (d.visibilityState === 'visible') {
+          d.removeEventListener('visibilitychange', onVisible);
+          startEngagement();
+          if (!manualMode) trackPageview();
+        }
+      };
+      d.addEventListener('visibilitychange', onVisible);
       return;
     }
 
-    if (!manualMode) {
-      trackPageview();
-    }
+    startEngagement();
+    if (!manualMode) trackPageview();
   }
 
-  // Use requestIdleCallback if available, otherwise run immediately
+  // Use requestIdleCallback for non-blocking init
   if (w.requestIdleCallback) {
     w.requestIdleCallback(init, { timeout: 1000 });
   } else {
