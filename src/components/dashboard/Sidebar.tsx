@@ -29,6 +29,7 @@ import {
   Lightbulb,
   Building2,
   Palette,
+  Layers,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -43,6 +44,7 @@ const navSections = [
     label: "Overview",
     items: [
       { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "Meus Sites", href: "/dashboard/sites", icon: Layers },
       { name: "Real-time", href: "/dashboard/realtime", icon: Activity },
     ],
   },
