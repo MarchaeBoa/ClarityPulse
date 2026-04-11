@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Menu,
   ChevronDown,
@@ -12,6 +14,10 @@ import {
   Bell,
   Calendar,
   Check,
+  LogOut,
+  User,
+  Settings,
+  Loader2,
 } from "lucide-react";
 
 interface TopbarProps {
@@ -78,8 +84,27 @@ function Dropdown({
 
 export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProps) {
   const { theme, toggleTheme } = useTheme();
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
   const [selectedProject, setSelectedProject] = useState(projects[0]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const userName = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "User";
+  const userEmail = user?.email ?? "";
+  const userInitials = userName
+    .split(" ")
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  async function handleSignOut() {
+    setLoggingOut(true);
+    await signOut();
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <header className="sticky top-0 z-20 h-16 flex items-center justify-between gap-4 px-4 md:px-6 border-b border-black/[0.04] dark:border-white/[0.06] bg-white/60 dark:bg-ink/60 backdrop-blur-xl">
@@ -213,10 +238,65 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-ember rounded-full" />
         </button>
 
-        {/* Avatar */}
-        <button className="ml-1 w-8 h-8 rounded-full bg-gradient-to-br from-jade to-sapphire flex items-center justify-center text-white text-xs font-bold">
-          M
-        </button>
+        {/* User menu */}
+        <Dropdown
+          trigger={
+            <button className="ml-1 flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors">
+              {authLoading ? (
+                <div className="w-8 h-8 rounded-full bg-white/[0.04] flex items-center justify-center">
+                  <Loader2 className="w-3.5 h-3.5 text-ghost animate-spin" />
+                </div>
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-jade to-sapphire flex items-center justify-center text-white text-xs font-bold">
+                  {userInitials}
+                </div>
+              )}
+              <ChevronDown className="w-3 h-3 text-ghost hidden sm:block" />
+            </button>
+          }
+          align="right"
+        >
+          {/* User info header */}
+          <div className="px-3 py-2.5 border-b border-black/[0.04] dark:border-white/[0.06]">
+            <p className="text-sm font-medium text-ink dark:text-white truncate max-w-[180px]">
+              {userName}
+            </p>
+            <p className="text-xs text-ghost truncate max-w-[180px]">
+              {userEmail}
+            </p>
+          </div>
+
+          {/* Menu items */}
+          <div className="py-1">
+            <button
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+            >
+              <User className="w-4 h-4" />
+              Meu perfil
+            </button>
+            <button
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Configuracoes
+            </button>
+          </div>
+
+          <div className="border-t border-black/[0.04] dark:border-white/[0.06] pt-1">
+            <button
+              onClick={handleSignOut}
+              disabled={loggingOut}
+              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ember hover:bg-ember/5 transition-colors disabled:opacity-50"
+            >
+              {loggingOut ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4" />
+              )}
+              {loggingOut ? "Saindo..." : "Sair"}
+            </button>
+          </div>
+        </Dropdown>
       </div>
     </header>
   );

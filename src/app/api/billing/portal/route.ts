@@ -8,9 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { buildPortalConfig } from "@/lib/billing/stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2026-03-25.dahlia",
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +29,7 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
     const config = buildPortalConfig({ customerId, baseUrl });
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: config.customerId,
       return_url: config.returnUrl,
     });

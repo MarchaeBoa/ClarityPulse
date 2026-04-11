@@ -8,9 +8,11 @@ import Stripe from "stripe";
 import { buildCheckoutConfig } from "@/lib/billing/stripe";
 import { PURCHASABLE_PLANS, type PlanSlug, type BillingCycle } from "@/lib/billing/plans";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+function getStripe() {
+  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2026-03-25.dahlia",
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Stripe Checkout Session
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: config.customerId ? undefined : config.customerEmail,
