@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useDashboard } from "@/contexts/DashboardContext";
 import {
   Users,
   Eye,
@@ -11,83 +12,30 @@ import {
   DollarSign,
   TrendingUp,
   TrendingDown,
+  BarChart3,
 } from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-} from "recharts";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 
-interface KPI {
-  label: string;
-  value: string;
-  change: number;
-  icon: React.ElementType;
-  sparkline: number[];
-  color: string;
-  tintColor: string;
+function pctChange(cur: number, prev: number): number {
+  if (prev === 0) return cur > 0 ? 100 : 0;
+  return Math.round(((cur - prev) / prev) * 1000) / 10;
 }
 
-const kpis: KPI[] = [
-  {
-    label: "Unique Visitors",
-    value: "24,521",
-    change: 12.5,
-    icon: Users,
-    sparkline: [30, 40, 35, 50, 49, 60, 70, 65, 80, 75, 90, 85, 95, 100],
-    color: "#1AE5A0",
-    tintColor: "bg-jade/[0.08]",
-  },
-  {
-    label: "Pageviews",
-    value: "68,342",
-    change: 8.3,
-    icon: Eye,
-    sparkline: [40, 45, 42, 55, 52, 58, 65, 60, 70, 68, 75, 72, 80, 78],
-    color: "#3B7BF8",
-    tintColor: "bg-sapphire/[0.08]",
-  },
-  {
-    label: "Bounce Rate",
-    value: "42.3%",
-    change: -3.2,
-    icon: ArrowDownRight,
-    sparkline: [60, 55, 58, 52, 50, 48, 46, 45, 44, 42, 43, 41, 42, 40],
-    color: "#F5653A",
-    tintColor: "bg-ember/[0.08]",
-  },
-  {
-    label: "Avg. Duration",
-    value: "3m 42s",
-    change: 15.1,
-    icon: Clock,
-    sparkline: [20, 25, 28, 30, 35, 33, 40, 38, 45, 42, 50, 48, 55, 52],
-    color: "#F0A500",
-    tintColor: "bg-gold/[0.08]",
-  },
-  {
-    label: "Conversions",
-    value: "1,284",
-    change: 22.4,
-    icon: Target,
-    sparkline: [15, 20, 18, 25, 30, 28, 35, 40, 38, 45, 50, 48, 55, 60],
-    color: "#1AE5A0",
-    tintColor: "bg-jade/[0.08]",
-  },
-  {
-    label: "Revenue",
-    value: "$12,480",
-    change: 18.7,
-    icon: DollarSign,
-    sparkline: [25, 30, 28, 35, 40, 38, 45, 42, 50, 55, 52, 60, 58, 65],
-    color: "#3B7BF8",
-    tintColor: "bg-sapphire/[0.08]",
-  },
-];
+function formatDuration(sec: number): string {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`.replace(".0k", "k");
+  return n.toLocaleString();
+}
 
 function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   const chartData = data.map((v, i) => ({ v, i }));
-
   return (
     <div className="w-20 h-8">
       <ResponsiveContainer width="100%" height="100%">
@@ -113,13 +61,123 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-export function KPICards() {
+function KPISkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
-      {kpis.map((kpi, i) => {
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl border bg-white dark:bg-surface border-black/[0.04] dark:border-white/[0.04] p-4"
+        >
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-8 h-8 rounded-lg bg-mist dark:bg-white/[0.04] animate-pulse" />
+            <div className="w-20 h-8 rounded-md bg-mist dark:bg-white/[0.04] animate-pulse" />
+          </div>
+          <div className="w-24 h-7 mb-2 rounded-md bg-mist dark:bg-white/[0.04] animate-pulse" />
+          <div className="flex items-center justify-between">
+            <div className="w-20 h-3 rounded bg-mist dark:bg-white/[0.04] animate-pulse" />
+            <div className="w-12 h-3 rounded bg-mist dark:bg-white/[0.04] animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyKPI() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl border bg-white dark:bg-surface border-black/[0.04] dark:border-white/[0.04] p-4 flex flex-col items-center justify-center min-h-[120px]"
+        >
+          <BarChart3 className="w-5 h-5 text-ghost/30 mb-2" />
+          <p className="text-xs text-ghost/50">No data</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function KPICards() {
+  const { data, loading } = useDashboard();
+
+  if (loading) return <KPISkeleton />;
+  if (!data) return <EmptyKPI />;
+
+  const { kpis, dailyTraffic } = data;
+
+  // Build sparkline from daily traffic
+  const visitorsSparkline = dailyTraffic.map((d) => d.visitors);
+  const pageviewsSparkline = dailyTraffic.map((d) => d.pageviews);
+  // For other KPIs, generate approximate sparklines from daily data
+  const emptySparkline = Array.from({ length: 14 }, () => 0);
+
+  const items = [
+    {
+      label: "Unique Visitors",
+      value: formatNumber(kpis.uniqueVisitors),
+      change: pctChange(kpis.uniqueVisitors, kpis.prevUniqueVisitors),
+      icon: Users,
+      sparkline: visitorsSparkline.length > 1 ? visitorsSparkline : emptySparkline,
+      color: "#1AE5A0",
+      tintColor: "bg-jade/[0.08]",
+    },
+    {
+      label: "Pageviews",
+      value: formatNumber(kpis.pageviews),
+      change: pctChange(kpis.pageviews, kpis.prevPageviews),
+      icon: Eye,
+      sparkline: pageviewsSparkline.length > 1 ? pageviewsSparkline : emptySparkline,
+      color: "#3B7BF8",
+      tintColor: "bg-sapphire/[0.08]",
+    },
+    {
+      label: "Bounce Rate",
+      value: `${kpis.bounceRate.toFixed(1)}%`,
+      change: pctChange(kpis.bounceRate, kpis.prevBounceRate),
+      icon: ArrowDownRight,
+      sparkline: emptySparkline,
+      color: "#F5653A",
+      tintColor: "bg-ember/[0.08]",
+    },
+    {
+      label: "Avg. Duration",
+      value: formatDuration(kpis.avgDuration),
+      change: pctChange(kpis.avgDuration, kpis.prevAvgDuration),
+      icon: Clock,
+      sparkline: emptySparkline,
+      color: "#F0A500",
+      tintColor: "bg-gold/[0.08]",
+    },
+    {
+      label: "Conversions",
+      value: formatNumber(kpis.conversions),
+      change: pctChange(kpis.conversions, kpis.prevConversions),
+      icon: Target,
+      sparkline: emptySparkline,
+      color: "#1AE5A0",
+      tintColor: "bg-jade/[0.08]",
+    },
+    {
+      label: "Revenue",
+      value: `$${formatNumber(kpis.revenue)}`,
+      change: pctChange(kpis.revenue, kpis.prevRevenue),
+      icon: DollarSign,
+      sparkline: emptySparkline,
+      color: "#3B7BF8",
+      tintColor: "bg-sapphire/[0.08]",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-4">
+      {items.map((kpi, i) => {
         const isPositive = kpi.change > 0;
         const isBounceRate = kpi.label === "Bounce Rate";
         const trendIsGood = isBounceRate ? !isPositive : isPositive;
+        const hasSparkline = kpi.sparkline.some((v) => v > 0);
 
         return (
           <motion.div
@@ -135,10 +193,15 @@ export function KPICards() {
             )}
           >
             <div className="flex items-start justify-between mb-3">
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", kpi.tintColor)}>
+              <div
+                className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center",
+                  kpi.tintColor
+                )}
+              >
                 <kpi.icon className="w-4 h-4" style={{ color: kpi.color }} />
               </div>
-              <MiniSparkline data={kpi.sparkline} color={kpi.color} />
+              {hasSparkline && <MiniSparkline data={kpi.sparkline} color={kpi.color} />}
             </div>
 
             <p className="text-xl md:text-2xl font-display font-bold tracking-tight text-ink dark:text-white mb-1">
@@ -147,19 +210,21 @@ export function KPICards() {
 
             <div className="flex items-center justify-between gap-2">
               <p className="text-[12px] text-ghost truncate">{kpi.label}</p>
-              <div
-                className={cn(
-                  "flex items-center gap-0.5 text-[11px] font-semibold flex-shrink-0",
-                  trendIsGood ? "text-jade" : "text-ember"
-                )}
-              >
-                {isPositive ? (
-                  <TrendingUp className="w-3 h-3" />
-                ) : (
-                  <TrendingDown className="w-3 h-3" />
-                )}
-                {Math.abs(kpi.change)}%
-              </div>
+              {kpi.change !== 0 && (
+                <div
+                  className={cn(
+                    "flex items-center gap-0.5 text-[11px] font-semibold flex-shrink-0",
+                    trendIsGood ? "text-jade" : "text-ember"
+                  )}
+                >
+                  {isPositive ? (
+                    <TrendingUp className="w-3 h-3" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3" />
+                  )}
+                  {Math.abs(kpi.change)}%
+                </div>
+              )}
             </div>
           </motion.div>
         );

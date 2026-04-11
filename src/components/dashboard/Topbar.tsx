@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDashboard } from "@/contexts/DashboardContext";
 import {
   Menu,
   ChevronDown,
@@ -20,25 +21,14 @@ import {
   Settings,
   Loader2,
   Plus,
+  RefreshCw,
 } from "lucide-react";
 
 interface TopbarProps {
   onMenuClick: () => void;
-  dateRange: string;
-  onDateRangeChange: (range: string) => void;
-}
-
-interface ProjectItem {
-  id: string;
-  name: string;
-  domain: string;
-  color: string;
 }
 
 const colorPool = ["bg-jade", "bg-sapphire", "bg-gold", "bg-ember", "bg-jade-dark"];
-function getProjectColor(id: string, index: number): string {
-  return colorPool[index % colorPool.length];
-}
 
 const dateRanges = [
   { label: "Today", value: "today" },
@@ -90,44 +80,24 @@ function Dropdown({
   );
 }
 
-export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProps) {
+export function Topbar({ onMenuClick }: TopbarProps) {
   const { theme, toggleTheme } = useTheme();
   const { user, loading: authLoading, signOut } = useAuth();
+  const {
+    dateRange,
+    setDateRange,
+    siteId,
+    setSiteId,
+    sites,
+    sitesLoading,
+    loading: dataLoading,
+    refresh,
+  } = useDashboard();
   const router = useRouter();
-  const [projects, setProjects] = useState<ProjectItem[]>([]);
-  const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
-  const [projectsLoading, setProjectsLoading] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const fetchProjects = useCallback(async () => {
-    try {
-      const res = await fetch("/api/projects");
-      if (res.ok) {
-        const data = await res.json();
-        const items: ProjectItem[] = data.map(
-          (p: { id: string; name: string; domain: string }, i: number) => ({
-            id: p.id,
-            name: p.name,
-            domain: p.domain,
-            color: getProjectColor(p.id, i),
-          })
-        );
-        setProjects(items);
-        if (items.length > 0 && !selectedProject) {
-          setSelectedProject(items[0]);
-        }
-      }
-    } catch {
-      // silent
-    } finally {
-      setProjectsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+  const selectedSite = sites.find((s) => s.id === siteId) ?? null;
 
   const userName = user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "User";
   const userEmail = user?.email ?? "";
@@ -160,13 +130,18 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
         <Dropdown
           trigger={
             <button className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors">
-              {projectsLoading ? (
+              {sitesLoading ? (
                 <Loader2 className="w-3.5 h-3.5 text-ghost animate-spin" />
-              ) : selectedProject ? (
+              ) : selectedSite ? (
                 <>
-                  <div className={cn("w-2 h-2 rounded-full", selectedProject.color)} />
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      colorPool[sites.indexOf(selectedSite) % colorPool.length]
+                    )}
+                  />
                   <span className="text-sm font-medium text-ink dark:text-white hidden sm:block">
-                    {selectedProject.name}
+                    {selectedSite.name}
                   </span>
                 </>
               ) : (
@@ -181,7 +156,7 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
               Sites
             </p>
           </div>
-          {projects.length === 0 ? (
+          {sites.length === 0 ? (
             <div className="px-3 py-3 text-center">
               <p className="text-xs text-ghost mb-2">Nenhum site cadastrado</p>
               <Link
@@ -194,23 +169,21 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
             </div>
           ) : (
             <>
-              {projects.map((p) => (
+              {sites.map((p, i) => (
                 <button
                   key={p.id}
-                  onClick={() => setSelectedProject(p)}
+                  onClick={() => setSiteId(p.id)}
                   className={cn(
                     "flex items-center gap-2.5 w-full px-3 py-2 text-sm transition-colors",
                     "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
-                    selectedProject?.id === p.id
-                      ? "text-ink dark:text-white"
-                      : "text-ghost"
+                    siteId === p.id ? "text-ink dark:text-white" : "text-ghost"
                   )}
                 >
-                  <div className={cn("w-2 h-2 rounded-full", p.color)} />
+                  <div
+                    className={cn("w-2 h-2 rounded-full", colorPool[i % colorPool.length])}
+                  />
                   <span className="flex-1 text-left truncate">{p.name}</span>
-                  {selectedProject?.id === p.id && (
-                    <Check className="w-3.5 h-3.5 text-jade" />
-                  )}
+                  {siteId === p.id && <Check className="w-3.5 h-3.5 text-jade" />}
                 </button>
               ))}
               <div className="border-t border-black/[0.04] dark:border-white/[0.06] mt-1 pt-1">
@@ -259,6 +232,16 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
           )}
         </div>
 
+        {/* Refresh button */}
+        <button
+          onClick={refresh}
+          disabled={dataLoading}
+          className="p-2 rounded-lg text-ghost hover:text-ink dark:hover:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors disabled:opacity-50"
+          title="Refresh data"
+        >
+          <RefreshCw className={cn("w-[18px] h-[18px]", dataLoading && "animate-spin")} />
+        </button>
+
         {/* Date Range */}
         <Dropdown
           trigger={
@@ -275,7 +258,7 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
           {dateRanges.map((r) => (
             <button
               key={r.value}
-              onClick={() => onDateRangeChange(r.value)}
+              onClick={() => setDateRange(r.value)}
               className={cn(
                 "flex items-center justify-between gap-4 w-full px-3 py-2 text-sm transition-colors",
                 "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
@@ -332,22 +315,16 @@ export function Topbar({ onMenuClick, dateRange, onDateRangeChange }: TopbarProp
             <p className="text-sm font-medium text-ink dark:text-white truncate max-w-[180px]">
               {userName}
             </p>
-            <p className="text-xs text-ghost truncate max-w-[180px]">
-              {userEmail}
-            </p>
+            <p className="text-xs text-ghost truncate max-w-[180px]">{userEmail}</p>
           </div>
 
           {/* Menu items */}
           <div className="py-1">
-            <button
-              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
-            >
+            <button className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors">
               <User className="w-4 h-4" />
               Meu perfil
             </button>
-            <button
-              className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
-            >
+            <button className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-ink/70 dark:text-ghost hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors">
               <Settings className="w-4 h-4" />
               Configuracoes
             </button>
