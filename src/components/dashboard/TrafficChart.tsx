@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useDashboard } from "@/contexts/DashboardContext";
+import { BarChart3 } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -11,38 +12,6 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-const periods = ["7D", "30D", "90D"] as const;
-
-function generateData(days: number) {
-  const data = [];
-  const base30 = [
-    820, 940, 880, 1020, 1080, 760, 680,
-    900, 960, 1040, 1120, 1160, 800, 720,
-    950, 1020, 1080, 1180, 1220, 840, 760,
-    1000, 1100, 1160, 1240, 1300, 880, 800,
-    1080, 1200,
-  ];
-  for (let i = 0; i < days; i++) {
-    const idx = i % base30.length;
-    const visitors = base30[idx] + Math.floor((i / days) * 200);
-    const pageviews = Math.floor(visitors * 2.5);
-    const d = new Date();
-    d.setDate(d.getDate() - (days - 1 - i));
-    data.push({
-      date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      visitors,
-      pageviews,
-    });
-  }
-  return data;
-}
-
-const datasets: Record<string, ReturnType<typeof generateData>> = {
-  "7D": generateData(7),
-  "30D": generateData(30),
-  "90D": generateData(90),
-};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
@@ -67,9 +36,57 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+function ChartSkeleton() {
+  return (
+    <div className="rounded-xl border bg-white dark:bg-surface border-black/[0.04] dark:border-white/[0.04] p-5">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <div className="w-28 h-4 mb-2 rounded-md bg-mist dark:bg-white/[0.04] animate-pulse" />
+          <div className="w-40 h-3 rounded-md bg-mist dark:bg-white/[0.04] animate-pulse" />
+        </div>
+      </div>
+      <div className="flex items-center gap-5 mb-4">
+        <div className="w-16 h-3 rounded bg-mist dark:bg-white/[0.04] animate-pulse" />
+        <div className="w-16 h-3 rounded bg-mist dark:bg-white/[0.04] animate-pulse" />
+      </div>
+      <div className="w-full h-[280px] rounded-lg bg-mist dark:bg-white/[0.04] animate-pulse" />
+    </div>
+  );
+}
+
+function EmptyChart() {
+  return (
+    <div className="rounded-xl border bg-white dark:bg-surface border-black/[0.04] dark:border-white/[0.04] p-5">
+      <div className="mb-5">
+        <h3 className="text-sm font-semibold text-ink dark:text-white">Traffic Overview</h3>
+        <p className="text-xs text-ghost mt-0.5">Visitors & pageviews over time</p>
+      </div>
+      <div className="h-[280px] flex flex-col items-center justify-center">
+        <BarChart3 className="w-10 h-10 text-ghost/20 mb-3" />
+        <p className="text-sm font-medium text-ghost/60">No traffic data yet</p>
+        <p className="text-xs text-ghost/40 mt-1">Data will appear once visitors start arriving</p>
+      </div>
+    </div>
+  );
+}
+
 export function TrafficChart() {
-  const [period, setPeriod] = useState<(typeof periods)[number]>("30D");
-  const data = datasets[period];
+  const { data, loading, dateRange } = useDashboard();
+
+  if (loading) return <ChartSkeleton />;
+  if (!data || data.dailyTraffic.length === 0) return <EmptyChart />;
+
+  const chartData = data.dailyTraffic.map((d) => ({
+    date: new Date(d.date).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    }),
+    visitors: d.visitors,
+    pageviews: d.pageviews,
+  }));
+
+  const days = chartData.length;
+  const interval = days <= 7 ? 0 : days <= 30 ? 4 : 14;
 
   return (
     <div className="rounded-xl border bg-white dark:bg-surface border-black/[0.04] dark:border-white/[0.04] p-5">
@@ -78,21 +95,20 @@ export function TrafficChart() {
           <h3 className="text-sm font-semibold text-ink dark:text-white">Traffic Overview</h3>
           <p className="text-xs text-ghost mt-0.5">Visitors & pageviews over time</p>
         </div>
-        <div className="flex items-center bg-mist dark:bg-white/[0.04] rounded-lg p-0.5">
-          {periods.map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={cn(
-                "px-3 py-1 text-xs font-medium rounded-md transition-all duration-200",
-                period === p
-                  ? "bg-white dark:bg-white/[0.08] text-ink dark:text-white shadow-sm"
-                  : "text-ghost hover:text-ink dark:hover:text-white"
-              )}
-            >
-              {p}
-            </button>
-          ))}
+        <div className="text-[11px] text-ghost bg-mist dark:bg-white/[0.04] px-2.5 py-1 rounded-lg font-medium">
+          {dateRange === "today"
+            ? "Today"
+            : dateRange === "yesterday"
+              ? "Yesterday"
+              : dateRange === "7d"
+                ? "Last 7 days"
+                : dateRange === "30d"
+                  ? "Last 30 days"
+                  : dateRange === "90d"
+                    ? "Last 90 days"
+                    : dateRange === "month"
+                      ? "This month"
+                      : "This year"}
         </div>
       </div>
 
@@ -110,7 +126,7 @@ export function TrafficChart() {
 
       <div className="h-[280px] -ml-2">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="gradVisitors" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#1AE5A0" stopOpacity={0.2} />
@@ -132,13 +148,15 @@ export function TrafficChart() {
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 11, fill: "#9BA0AE" }}
-              interval={period === "7D" ? 0 : period === "30D" ? 4 : 14}
+              interval={interval}
             />
             <YAxis
               axisLine={false}
               tickLine={false}
               tick={{ fontSize: 11, fill: "#9BA0AE" }}
-              tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v)}
+              tickFormatter={(v) =>
+                v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v
+              }
               width={45}
             />
             <Tooltip content={<CustomTooltip />} />
