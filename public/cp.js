@@ -1,5 +1,5 @@
 /**
- * ClarityPulse Tracking Script v2
+ * ClarityPulse Tracking Script v3
  * Privacy-first, cookie-free, lightweight analytics
  *
  * Features:
@@ -9,18 +9,29 @@
  * - SPA-compatible (History API + hash routing)
  * - No cookies, no PII collection
  * - Do Not Track respected
+ * - Pre-load command queue
  *
- * Usage:
- *   <script data-site="YOUR_TOKEN" src="https://cdn.claritypulse.io/cp.js" defer></script>
+ * Installation:
+ *   <script defer data-site="YOUR_TOKEN" src="https://cdn.claritypulse.io/cp.js"></script>
  *
  * Custom events:
- *   window.claritypulse('event', 'signup_click', { plan: 'pro' });
+ *   claritypulse.track('signup_button_click');
+ *   claritypulse.track('purchase', { plan: 'pro', value: 49 });
+ *
+ * Manual pageview (when data-manual is set):
+ *   claritypulse.pageview();
+ *
+ * Pre-load queue (call before script loads):
+ *   <script>
+ *     window.claritypulse = window.claritypulse || [];
+ *     claritypulse.push(['track', 'early_click']);
+ *   </script>
  *
  * Attributes:
- *   data-site    — Required. Your site public token.
- *   data-api     — API endpoint (default: /api/collect)
- *   data-manual  — Disable automatic pageview tracking
- *   data-hash    — Enable hash-based routing support
+ *   data-site    - Required. Your site public token.
+ *   data-api     - API endpoint (default: origin of this script + /api/collect)
+ *   data-manual  - Disable automatic pageview tracking
+ *   data-hash    - Enable hash-based routing support
  *
  * Size target: < 4kb gzipped
  */
@@ -32,23 +43,47 @@
   var n = navigator;
   var l = location;
 
-  // --- Early exit conditions ---
+  // ================================================================
+  // Early exit conditions
+  // ================================================================
+
   if (d.visibilityState === 'prerender') return;
   if (n.doNotTrack === '1' || w.doNotTrack === '1') return;
   if (n.webdriver) return;
 
-  // --- Script config ---
+  // ================================================================
+  // Script configuration from data attributes
+  // ================================================================
+
   var scriptEl = d.currentScript || d.querySelector('script[data-site]');
   if (!scriptEl) return;
 
   var siteToken = scriptEl.getAttribute('data-site');
   if (!siteToken) return;
 
-  var apiUrl = scriptEl.getAttribute('data-api') || '/api/collect';
+  // Resolve API URL: explicit data-api, or derive from script src origin
+  var apiUrl = scriptEl.getAttribute('data-api');
+  if (!apiUrl) {
+    var src = scriptEl.getAttribute('src');
+    if (src) {
+      try {
+        var origin = new URL(src, l.href).origin;
+        apiUrl = origin + '/api/collect';
+      } catch (e) {
+        apiUrl = '/api/collect';
+      }
+    } else {
+      apiUrl = '/api/collect';
+    }
+  }
+
   var manualMode = scriptEl.hasAttribute('data-manual');
   var hashMode = scriptEl.hasAttribute('data-hash');
 
-  // --- Hostname filter ---
+  // ================================================================
+  // Hostname filter - don't track local/test environments
+  // ================================================================
+
   var hostname = l.hostname;
   if (
     hostname === 'localhost' ||
@@ -60,11 +95,13 @@
     return;
   }
 
-  // --- Ignore param ---
   if (l.search.indexOf('claritypulse_ignore=true') !== -1) return;
 
-  // --- Sensitive query params to strip ---
-  var sensitiveParams = [
+  // ================================================================
+  // Sensitive query params to strip from tracked URLs
+  // ================================================================
+
+  var SENSITIVE = [
     'email', 'token', 'password', 'secret', 'key', 'auth',
     'access_token', 'refresh_token', 'api_key', 'apikey',
     'session_id', 'sessionid', 'credential', 'ssn', 'credit_card'
@@ -74,29 +111,29 @@
   // Utilities
   // ================================================================
 
-  /** FNV-1a 32-bit hash */
+  /** FNV-1a 32-bit hash - fast, non-cryptographic */
   function fnv1a(str) {
-    var hash = 0x811c9dc5;
+    var h = 0x811c9dc5;
     for (var i = 0; i < str.length; i++) {
-      hash ^= str.charCodeAt(i);
-      hash = (hash * 0x01000193) >>> 0;
+      h ^= str.charCodeAt(i);
+      h = (h * 0x01000193) >>> 0;
     }
-    return hash.toString(16);
+    return h.toString(16);
   }
 
   /** Strip sensitive parameters from query string */
   function sanitizeQuery(search) {
     if (!search || search.length < 2) return '';
     try {
-      var params = search.substring(1).split('&');
+      var pairs = search.substring(1).split('&');
       var clean = [];
-      for (var i = 0; i < params.length; i++) {
-        var key = params[i].split('=')[0].toLowerCase();
-        var found = false;
-        for (var j = 0; j < sensitiveParams.length; j++) {
-          if (key === sensitiveParams[j]) { found = true; break; }
+      for (var i = 0; i < pairs.length; i++) {
+        var k = pairs[i].split('=')[0].toLowerCase();
+        var blocked = false;
+        for (var j = 0; j < SENSITIVE.length; j++) {
+          if (k === SENSITIVE[j]) { blocked = true; break; }
         }
-        if (!found) clean.push(params[i]);
+        if (!blocked) clean.push(pairs[i]);
       }
       return clean.length ? '?' + clean.join('&') : '';
     } catch (e) {
@@ -108,80 +145,78 @@
   function parseUTM() {
     var utm = {};
     try {
-      var params = l.search.substring(1).split('&');
-      for (var i = 0; i < params.length; i++) {
-        var parts = params[i].split('=');
-        var k = decodeURIComponent(parts[0]);
-        var v = parts[1] ? decodeURIComponent(parts[1]) : '';
-        if (k === 'utm_source') utm.us = v;
-        else if (k === 'utm_medium') utm.um = v;
-        else if (k === 'utm_campaign') utm.uc = v;
-        else if (k === 'utm_content') utm.un = v;
-        else if (k === 'utm_term') utm.ut = v;
+      var pairs = l.search.substring(1).split('&');
+      var map = {
+        utm_source: 'us', utm_medium: 'um', utm_campaign: 'uc',
+        utm_content: 'un', utm_term: 'ut'
+      };
+      for (var i = 0; i < pairs.length; i++) {
+        var kv = pairs[i].split('=');
+        var key = decodeURIComponent(kv[0]);
+        if (map[key] && kv[1]) {
+          utm[map[key]] = decodeURIComponent(kv[1]);
+        }
       }
     } catch (e) { /* silent */ }
     return utm;
   }
 
-  /** Extract domain from a URL */
+  /** Extract hostname from a URL string */
   function extractDomain(url) {
     if (!url) return '';
     try {
-      var a = d.createElement('a');
-      a.href = url.indexOf('//') === 0 ? 'https:' + url : url;
-      return a.hostname || '';
+      return new URL(url).hostname;
     } catch (e) {
       return '';
     }
   }
 
   // ================================================================
-  // Session Management (cookie-free, day-scoped)
+  // Session (cookie-free, day-scoped)
   // ================================================================
 
   var today = new Date().toISOString().substring(0, 10);
-  var fingerprint = [
+  var sessionId = fnv1a([
     screen.width, screen.height, screen.colorDepth,
-    n.language || '',
-    new Date().getTimezoneOffset(),
-    today
-  ].join('|');
-  var sessionId = fnv1a(fingerprint + String(Math.random()));
+    n.language || '', new Date().getTimezoneOffset(), today
+  ].join('|') + Math.random());
   var isFirstPageview = true;
 
   // ================================================================
-  // Event Buffer (batching)
+  // Event buffer and batching
   // ================================================================
 
   var buffer = [];
-  var FLUSH_INTERVAL = 2000;
-  var MAX_BUFFER = 10;
+  var FLUSH_MS = 2000;
+  var MAX_BATCH = 10;
   var flushTimer = null;
 
   function flush() {
     if (!buffer.length) return;
-    var batch = buffer.splice(0, buffer.length);
-    sendBatch(batch);
+    sendBatch(buffer.splice(0, buffer.length));
   }
 
   function enqueue(payload) {
     buffer.push(payload);
-    if (buffer.length >= MAX_BUFFER) {
+    if (buffer.length >= MAX_BATCH) {
       if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
       flush();
     } else if (!flushTimer) {
       flushTimer = setTimeout(function () {
         flushTimer = null;
         flush();
-      }, FLUSH_INTERVAL);
+      }, FLUSH_MS);
     }
   }
 
-  /** Send a batch of events. Fallback chain: sendBeacon → fetch → XHR */
+  /**
+   * Send a batch of events to the API.
+   * Fallback chain: sendBeacon -> fetch(keepalive) -> XMLHttpRequest
+   */
   function sendBatch(events) {
     var data = JSON.stringify({ e: events, tk: siteToken });
 
-    // 1. sendBeacon (survives page unload)
+    // 1. sendBeacon - survives page unload
     try {
       if (n.sendBeacon) {
         var blob = new Blob([data], { type: 'application/json' });
@@ -190,42 +225,31 @@
     } catch (e) { /* fall through */ }
 
     // 2. fetch with keepalive
-    try {
-      fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: data,
-        keepalive: true,
-        mode: 'cors',
-        credentials: 'omit'
-      }).catch(function () { /* silent */ });
-    } catch (e) {
-      // 3. XMLHttpRequest (final fallback)
+    if (typeof fetch === 'function') {
       try {
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', apiUrl, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.send(data);
-      } catch (e2) { /* give up silently */ }
+        fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: data,
+          keepalive: true,
+          mode: 'cors',
+          credentials: 'omit'
+        }).catch(function () {});
+        return;
+      } catch (e) { /* fall through */ }
     }
+
+    // 3. XMLHttpRequest - final fallback
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', apiUrl, true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.send(data);
+    } catch (e) { /* silent */ }
   }
 
   // ================================================================
-  // Deduplication
-  // ================================================================
-
-  var lastPageviewPath = '';
-  var lastPageviewTime = 0;
-  var DEDUP_INTERVAL = 500;
-
-  // ================================================================
-  // UTM Cache
-  // ================================================================
-
-  var utmParams = parseUTM();
-
-  // ================================================================
-  // Engagement Time Tracking
+  // Engagement time tracking
   // ================================================================
 
   var engagementStart = 0;
@@ -246,10 +270,10 @@
     }
   }
 
-  function getEngagementTime() {
-    var total = totalEngagement;
-    if (isEngaged) total += Date.now() - engagementStart;
-    return Math.round(total / 1000); // seconds
+  function getEngagementSec() {
+    var t = totalEngagement;
+    if (isEngaged) t += Date.now() - engagementStart;
+    return Math.round(t / 1000);
   }
 
   function resetEngagement() {
@@ -259,25 +283,22 @@
   }
 
   // ================================================================
-  // Scroll Depth Tracking
+  // Scroll depth tracking
   // ================================================================
 
   var maxScrollDepth = 0;
   var scrollThrottle = null;
 
   function updateScrollDepth() {
-    var docHeight = Math.max(
+    var docH = Math.max(
       d.body ? d.body.scrollHeight : 0,
       d.documentElement ? d.documentElement.scrollHeight : 0
     );
-    var viewportHeight = w.innerHeight || 0;
-    var scrollable = docHeight - viewportHeight;
-    if (scrollable <= 0) {
-      maxScrollDepth = 100;
-      return;
-    }
-    var scrollTop = w.pageYOffset || (d.documentElement ? d.documentElement.scrollTop : 0) || 0;
-    var depth = Math.round((scrollTop / scrollable) * 100);
+    var vpH = w.innerHeight || 0;
+    var scrollable = docH - vpH;
+    if (scrollable <= 0) { maxScrollDepth = 100; return; }
+    var top = w.pageYOffset || (d.documentElement ? d.documentElement.scrollTop : 0) || 0;
+    var depth = Math.round((top / scrollable) * 100);
     if (depth > maxScrollDepth) maxScrollDepth = Math.min(depth, 100);
   }
 
@@ -291,26 +312,37 @@
   }, { passive: true });
 
   // ================================================================
-  // Core Tracking
+  // Deduplication
+  // ================================================================
+
+  var lastPvPath = '';
+  var lastPvTime = 0;
+  var DEDUP_MS = 500;
+
+  // ================================================================
+  // UTM cache
+  // ================================================================
+
+  var utmParams = parseUTM();
+
+  // ================================================================
+  // Core: pageview tracking
   // ================================================================
 
   var leaveSent = false;
 
-  /** Track a pageview event */
   function trackPageview() {
     var now = Date.now();
-    var currentPath = l.pathname;
+    var path = l.pathname;
 
-    // Dedup: same path within 500ms
-    if (currentPath === lastPageviewPath && now - lastPageviewTime < DEDUP_INTERVAL) {
-      return;
-    }
+    // Dedup same path within 500ms
+    if (path === lastPvPath && now - lastPvTime < DEDUP_MS) return;
 
     // Only track visible pages
     if (d.visibilityState === 'hidden') return;
 
-    lastPageviewPath = currentPath;
-    lastPageviewTime = now;
+    lastPvPath = path;
+    lastPvTime = now;
 
     // Reset engagement and scroll for new page
     leaveSent = false;
@@ -318,18 +350,18 @@
     maxScrollDepth = 0;
 
     var referrer = d.referrer;
-    var referrerDomain = extractDomain(referrer);
+    var refDomain = extractDomain(referrer);
 
-    // Don't count same-site as referrer
-    if (referrerDomain === hostname) {
+    // Don't count same-site navigation as referrer
+    if (refDomain === hostname) {
       referrer = '';
-      referrerDomain = '';
+      refDomain = '';
     }
 
     var payload = {
       t: 'pv',
       u: l.href.substring(0, 2048),
-      p: currentPath,
+      p: path,
       q: sanitizeQuery(l.search),
       vw: w.innerWidth || 0,
       vh: w.innerHeight || 0,
@@ -338,13 +370,13 @@
       uniq: isFirstPageview ? 1 : 0
     };
 
-    // Add referrer only on first pageview or external referrer
+    // Add referrer on first pageview
     if (referrer && isFirstPageview) {
       payload.r = referrer.substring(0, 2048);
-      payload.rd = referrerDomain;
+      payload.rd = refDomain;
     }
 
-    // Add UTMs (only if present)
+    // Add UTM params when present
     if (utmParams.us) payload.us = utmParams.us;
     if (utmParams.um) payload.um = utmParams.um;
     if (utmParams.uc) payload.uc = utmParams.uc;
@@ -355,16 +387,19 @@
     enqueue(payload);
   }
 
-  /** Track a custom event */
+  // ================================================================
+  // Core: custom event tracking
+  // ================================================================
+
   function trackEvent(name, properties) {
     if (!name || typeof name !== 'string') return;
 
-    // Sanitize event name
-    name = name.substring(0, 128).replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+    // Sanitize name: max 128 chars, alphanumeric + _ - .
+    var cleanName = name.substring(0, 128).replace(/[^a-zA-Z0-9_\-\.]/g, '_');
 
-    // Sanitize properties
+    // Sanitize properties: max 10 keys, strings capped at 256 chars
     var cleanProps = null;
-    if (properties && typeof properties === 'object') {
+    if (properties && typeof properties === 'object' && !Array.isArray(properties)) {
       cleanProps = {};
       var keys = Object.keys(properties);
       var count = Math.min(keys.length, 10);
@@ -374,11 +409,12 @@
         if (typeof v === 'string') cleanProps[k] = v.substring(0, 256);
         else if (typeof v === 'number' || typeof v === 'boolean') cleanProps[k] = v;
       }
+      if (!Object.keys(cleanProps).length) cleanProps = null;
     }
 
     var payload = {
       t: 'ev',
-      n: name,
+      n: cleanName,
       u: l.href.substring(0, 2048),
       p: l.pathname,
       ts: Date.now(),
@@ -389,15 +425,18 @@
     enqueue(payload);
   }
 
-  /** Track page leave with engagement time and scroll depth */
+  // ================================================================
+  // Core: page leave tracking
+  // ================================================================
+
   function trackPageLeave() {
     if (leaveSent) return;
     leaveSent = true;
 
     pauseEngagement();
-    var et = getEngagementTime();
+    var et = getEngagementSec();
 
-    // Don't track sub-second visits (likely bots or bounces with no interaction)
+    // Skip sub-second visits (bots or bounces with no interaction)
     if (et < 1) return;
 
     buffer.push({
@@ -408,11 +447,11 @@
       ts: Date.now(),
       sid: sessionId
     });
-    flush(); // Immediate flush — page may be closing
+    flush(); // Immediate - page may be closing
   }
 
   // ================================================================
-  // SPA Support: History API interception
+  // SPA support: History API interception
   // ================================================================
 
   var previousPath = l.pathname + (hashMode ? l.hash : '');
@@ -421,38 +460,33 @@
     var newPath = l.pathname + (hashMode ? l.hash : '');
     if (newPath === previousPath) return;
 
-    // Send page leave for the previous page
     trackPageLeave();
-
     previousPath = newPath;
     utmParams = parseUTM();
 
-    if (!manualMode) {
-      trackPageview();
-    }
+    if (!manualMode) trackPageview();
   }
 
-  // Monkey-patch pushState and replaceState
-  function patchHistory(method) {
-    var original = history[method];
-    if (!original) return;
-
-    history[method] = function () {
-      var result = original.apply(this, arguments);
-      setTimeout(onNavigation, 0);
-      return result;
-    };
+  // Patch pushState and replaceState
+  var methods = ['pushState', 'replaceState'];
+  for (var m = 0; m < methods.length; m++) {
+    (function (method) {
+      var original = history[method];
+      if (!original) return;
+      history[method] = function () {
+        var result = original.apply(this, arguments);
+        setTimeout(onNavigation, 0);
+        return result;
+      };
+    })(methods[m]);
   }
 
-  patchHistory('pushState');
-  patchHistory('replaceState');
-
-  // Back/forward navigation
+  // Back/forward button
   w.addEventListener('popstate', function () {
     setTimeout(onNavigation, 0);
   });
 
-  // Hash-based routing support
+  // Hash routing
   if (hashMode) {
     w.addEventListener('hashchange', function () {
       setTimeout(onNavigation, 0);
@@ -460,14 +494,13 @@
   }
 
   // ================================================================
-  // Visibility & Focus (engagement tracking + page leave)
+  // Visibility and focus (engagement + page leave)
   // ================================================================
 
   d.addEventListener('visibilitychange', function () {
     if (d.visibilityState === 'hidden') {
       trackPageLeave();
     } else {
-      // Tab came back — allow a new page leave to fire
       leaveSent = false;
       startEngagement();
     }
@@ -475,30 +508,40 @@
 
   w.addEventListener('focus', startEngagement);
   w.addEventListener('blur', pauseEngagement);
-
-  // pagehide covers tab close and navigation away (bfcache safe)
   w.addEventListener('pagehide', trackPageLeave);
 
   // ================================================================
   // Public API
   // ================================================================
 
-  w.claritypulse = function (command, arg1, arg2) {
-    switch (command) {
-      case 'event':
-        trackEvent(arg1, arg2);
-        break;
-      case 'pageview':
-        trackPageview();
-        break;
+  // Save pre-load queue before overwriting
+  var preQueue = w.claritypulse;
+
+  w.claritypulse = {
+    /** Track a custom event */
+    track: function (name, props) {
+      trackEvent(name, props);
+    },
+    /** Manually track a pageview */
+    pageview: function () {
+      trackPageview();
+    },
+    /** Flush pending events immediately */
+    flush: function () {
+      flush();
     }
   };
 
-  // Process queued commands (if user called claritypulse() before script loaded)
-  var queue = w.claritypulse && w.claritypulse.q;
-  if (queue && queue.length) {
-    for (var i = 0; i < queue.length; i++) {
-      w.claritypulse.apply(null, queue[i]);
+  // Drain pre-load queue
+  // Usage before script loads:
+  //   window.claritypulse = window.claritypulse || [];
+  //   claritypulse.push(['track', 'early_click', { source: 'hero' }]);
+  if (preQueue && preQueue.length) {
+    for (var qi = 0; qi < preQueue.length; qi++) {
+      var cmd = preQueue[qi];
+      if (Array.isArray(cmd) && cmd[0] && w.claritypulse[cmd[0]]) {
+        w.claritypulse[cmd[0]](cmd[1], cmd[2]);
+      }
     }
   }
 
@@ -506,28 +549,18 @@
   // Initialization
   // ================================================================
 
-  function init() {
-    if (d.visibilityState === 'hidden') {
-      // Page opened in background — wait until visible
-      var onVisible = function () {
-        if (d.visibilityState === 'visible') {
-          d.removeEventListener('visibilitychange', onVisible);
-          startEngagement();
-          if (!manualMode) trackPageview();
-        }
-      };
-      d.addEventListener('visibilitychange', onVisible);
-      return;
-    }
-
+  if (d.visibilityState === 'hidden') {
+    var onVisible = function () {
+      if (d.visibilityState === 'visible') {
+        d.removeEventListener('visibilitychange', onVisible);
+        startEngagement();
+        if (!manualMode) trackPageview();
+      }
+    };
+    d.addEventListener('visibilitychange', onVisible);
+  } else {
     startEngagement();
     if (!manualMode) trackPageview();
   }
 
-  // Use requestIdleCallback for non-blocking init
-  if (w.requestIdleCallback) {
-    w.requestIdleCallback(init, { timeout: 1000 });
-  } else {
-    init();
-  }
 })();
