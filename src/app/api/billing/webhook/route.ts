@@ -8,7 +8,7 @@ import Stripe from "stripe";
 import { HANDLED_EVENTS, mapStripeStatus, type StripeWebhookEvent } from "@/lib/billing/stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2026-03-25.dahlia",
 });
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -128,9 +128,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  const subscriptionId = typeof invoice.subscription === "string"
-    ? invoice.subscription
-    : invoice.subscription?.id;
+  const sub = (invoice as unknown as Record<string, unknown>).subscription;
+  const subscriptionId = typeof sub === "string" ? sub : (sub as { id?: string } | null)?.id;
 
   // TODO: Update database
   // 1. Update subscription status to 'active'
@@ -139,9 +138,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = typeof invoice.subscription === "string"
-    ? invoice.subscription
-    : invoice.subscription?.id;
+  const sub2 = (invoice as unknown as Record<string, unknown>).subscription;
+  const subscriptionId = typeof sub2 === "string" ? sub2 : (sub2 as { id?: string } | null)?.id;
 
   // TODO: Update database
   // 1. Update subscription status to 'past_due'

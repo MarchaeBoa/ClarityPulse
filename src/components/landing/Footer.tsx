@@ -5,19 +5,18 @@ import { Reveal, Stagger, MotionItem } from "./motion";
 
 const footerLinks = {
   Produto: [
-    { label: "Dashboard", href: "#" },
+    { label: "Dashboard", href: "#dashboard-preview" },
     { label: "IA Insights", href: "#" },
-    { label: "Eventos & Conversões", href: "#" },
-    { label: "Relatórios", href: "#" },
-    { label: "Integrações", href: "#integracoes" },
+    { label: "Eventos & Conversoes", href: "#eventos" },
+    { label: "Relatorios", href: "#" },
     { label: "Pricing", href: "#pricing" },
     { label: "Changelog", href: "#" },
   ],
   Recursos: [
-    { label: "Documentação", href: "#" },
+    { label: "Documentacao", href: "#" },
     { label: "API Reference", href: "#" },
     { label: "Blog", href: "#" },
-    { label: "Guia de migração GA4", href: "#" },
+    { label: "Guia de migracao GA4", href: "#" },
     { label: "Status", href: "#" },
     { label: "Comunidade", href: "#" },
   ],
@@ -57,7 +56,10 @@ export default function Footer() {
     <footer className="relative pt-16 pb-10 border-t border-white/[0.04]">
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Main grid */}
-        <Stagger slow className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-16">
+        <Stagger
+          slow
+          className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-16"
+        >
           {/* Brand column */}
           <MotionItem className="col-span-2 md:col-span-1">
             <a href="#" className="flex items-center gap-2.5 mb-4 group">
@@ -85,10 +87,19 @@ export default function Footer() {
                   key={social.label}
                   href="#"
                   whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                  className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-ghost hover:text-white hover:border-white/[0.12] transition-all duration-200"
+                  className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-ghost hover:text-white hover:border-white/[0.12] hover:bg-white/[0.06] transition-all duration-200"
                   aria-label={social.label}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d={social.path} />
                   </svg>
                 </motion.a>
@@ -122,12 +133,15 @@ export default function Footer() {
         <Reveal>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-white/[0.04]">
             <p className="text-[11px] font-mono text-ghost/30">
-              &copy; {new Date().getFullYear()} ClarityPulse. Todos os direitos reservados.
+              &copy; {new Date().getFullYear()} ClarityPulse. Todos os direitos
+              reservados.
             </p>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-jade" />
-                <span className="text-[10px] font-mono text-ghost/30">Todos os sistemas operacionais</span>
+                <span className="text-[10px] font-mono text-ghost/30">
+                  Todos os sistemas operacionais
+                </span>
               </div>
               <span className="text-[10px] font-mono text-ghost/20">|</span>
               <span className="text-[10px] font-mono text-ghost/30">
