@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, useInView, useScroll, useTransform } from "framer-motion";
 import { Reveal, Float, Stagger, MotionItem } from "./motion";
 
 /* ============================================
@@ -15,36 +15,25 @@ function AnimatedCounter({
   suffix?: string;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.5 });
   const hasAnimated = useRef(false);
 
   useEffect(() => {
+    if (!inView || hasAnimated.current) return;
     const el = ref.current;
-    if (!el || hasAnimated.current) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated.current) {
-          hasAnimated.current = true;
-          const duration = 1400;
-          const startTime = performance.now();
-
-          const animate = (now: number) => {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 4);
-            el.textContent =
-              Math.floor(eased * target).toLocaleString() + suffix;
-            if (progress < 1) requestAnimationFrame(animate);
-          };
-          requestAnimationFrame(animate);
-        }
-      },
-      { threshold: 0.5 }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [target, suffix]);
+    if (!el) return;
+    hasAnimated.current = true;
+    const duration = 1400;
+    const startTime = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 4);
+      el.textContent = Math.floor(eased * target).toLocaleString() + suffix;
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [inView, target, suffix]);
 
   return <span ref={ref}>0{suffix}</span>;
 }
