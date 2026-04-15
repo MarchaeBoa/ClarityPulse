@@ -131,22 +131,31 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <Reveal>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-white/[0.04]">
-            <p className="text-[11px] font-mono text-ghost/30">
-              &copy; {new Date().getFullYear()} ClarityPulse. Todos os direitos
-              reservados.
-            </p>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-jade" />
+          <div className="flex flex-col gap-4 pt-8 border-t border-white/[0.04]">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-[11px] font-mono text-ghost/30">
+                &copy; {new Date().getFullYear()} ClarityPulse. Todos os
+                direitos reservados.
+              </p>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-jade" />
+                  <span className="text-[10px] font-mono text-ghost/30">
+                    Todos os sistemas operacionais
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-ghost/20">|</span>
                 <span className="text-[10px] font-mono text-ghost/30">
-                  Todos os sistemas operacionais
+                  Hospedado na EU
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-ghost/20">|</span>
-              <span className="text-[10px] font-mono text-ghost/30">
-                Hospedado na EU
-              </span>
+            </div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] font-mono text-ghost/30">
+              <p>
+                ClarityPulse e um produto Soutag Brasil &middot; Soutag
+                Tecnologia Brasil LTDA
+              </p>
+              <p>CNPJ 50.892.860/0001-55</p>
             </div>
           </div>
         </Reveal>
