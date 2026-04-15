@@ -150,12 +150,13 @@ export default function Footer() {
                 </span>
               </div>
             </div>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] font-mono text-ghost/30">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] font-mono text-ghost/40">
               <p>
-                ClarityPulse e um produto Soutag Brasil &middot; Soutag
-                Tecnologia Brasil LTDA
+                ClarityPulse e um produto{" "}
+                <span className="text-ghost/60">Soutag Brasil</span>{" "}
+                &middot; Soutag Tecnologia Brasil LTDA
               </p>
-              <p>CNPJ 50.892.860/0001-55</p>
+              <p>CNPJ: 50.892.860/0001-55</p>
             </div>
           </div>
         </Reveal>
