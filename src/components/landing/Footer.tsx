@@ -53,7 +53,7 @@ const socialLinks = [
 
 export default function Footer() {
   return (
-    <footer className="relative pt-16 pb-10 border-t border-white/[0.04]">
+    <footer className="relative pt-16 pb-10 border-t border-white/10">
       <div className="max-w-[1200px] mx-auto px-6">
         {/* Main grid */}
         <Stagger
@@ -87,7 +87,7 @@ export default function Footer() {
                   key={social.label}
                   href="#"
                   whileHover={{ y: -2, transition: { duration: 0.2 } }}
-                  className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center text-ghost hover:text-white hover:border-white/[0.12] hover:bg-white/[0.06] transition-all duration-200"
+                  className="w-8 h-8 rounded-lg bg-white/[0.06] border border-white/15 flex items-center justify-center text-ghost hover:text-white hover:border-white/30 hover:bg-white/10 transition-all duration-200"
                   aria-label={social.label}
                 >
                   <svg
@@ -110,7 +110,7 @@ export default function Footer() {
           {/* Link columns */}
           {Object.entries(footerLinks).map(([title, links]) => (
             <MotionItem key={title}>
-              <h4 className="text-[10px] font-mono font-medium text-ghost/40 uppercase tracking-[0.15em] mb-4">
+              <h4 className="text-[10px] font-mono font-medium text-ghost/70 uppercase tracking-[0.15em] mb-4">
                 {title}
               </h4>
               <ul className="flex flex-col gap-2.5">
@@ -131,29 +131,29 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <Reveal>
-          <div className="flex flex-col gap-4 pt-8 border-t border-white/[0.04]">
+          <div className="flex flex-col gap-4 pt-8 border-t border-white/10">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-[11px] font-mono text-ghost/30">
+              <p className="text-[11px] font-mono text-ghost">
                 &copy; {new Date().getFullYear()} ClarityPulse. Todos os
                 direitos reservados.
               </p>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-jade" />
-                  <span className="text-[10px] font-mono text-ghost/30">
+                  <span className="text-[10px] font-mono text-ghost">
                     Todos os sistemas operacionais
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-ghost/20">|</span>
-                <span className="text-[10px] font-mono text-ghost/30">
+                <span className="text-[10px] font-mono text-ghost/50">|</span>
+                <span className="text-[10px] font-mono text-ghost">
                   Hospedado na EU
                 </span>
               </div>
             </div>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] font-mono text-ghost/40">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-2 text-[10px] font-mono text-ghost/80">
               <p>
                 ClarityPulse e um produto{" "}
-                <span className="text-ghost/60">Soutag Brasil</span>{" "}
+                <span className="text-white">Soutag Brasil</span>{" "}
                 &middot; Soutag Tecnologia Brasil LTDA
               </p>
               <p>CNPJ: 50.892.860/0001-55</p>
