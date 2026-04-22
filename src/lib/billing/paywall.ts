@@ -194,16 +194,6 @@ export function getAIChatLimitPaywall(planSlug: PlanSlug): PaywallMessage {
   const nextPlan = getNextPlan(planSlug);
   const plan = PLANS[planSlug];
 
-  if (!plan.ai.chatEnabled) {
-    return {
-      title: "Desbloqueie o Pulse AI",
-      description: "Converse com seus dados usando linguagem natural. Pergunte sobre tendências, compare períodos e descubra insights — tudo em português.",
-      cta: nextPlan ? `Ativar com ${PLANS[nextPlan].name} — ${planCtaPrice(nextPlan)}` : "Falar com vendas",
-      targetPlan: nextPlan ?? "enterprise",
-      tone: "value",
-    };
-  }
-
   return {
     title: "Limite de mensagens atingido",
     description: `Você usou todas as ${plan.ai.chatMessagesPerDay} mensagens do Pulse AI hoje. Faça upgrade para conversar mais com seus dados.`,
@@ -231,29 +221,6 @@ export function getUpgradeIncentives(currentPlan: PlanSlug): UpgradeIncentive[] 
 
   const next = PLANS[nextPlan];
   const incentives: UpgradeIncentive[] = [];
-
-  if (currentPlan === "free") {
-    incentives.push(
-      {
-        trigger: "dashboard_view",
-        message: "Desbloqueie IA Insights e veja o que seus dados escondem",
-        cta: `Teste o ${next.name} grátis por ${next.trialDays} dias`,
-        targetPlan: nextPlan,
-      },
-      {
-        trigger: "7_days_active",
-        message: "Você está aproveitando bem o ClarityPulse! Que tal desbloquear o potencial completo?",
-        cta: `Upgrade para ${next.name} — ${formatPrice(next.priceMonthly)}/mês`,
-        targetPlan: nextPlan,
-      },
-      {
-        trigger: "pageview_50_percent",
-        message: "Você já usou metade do limite de pageviews. Garanta espaço para crescer.",
-        cta: `Ver plano ${next.name}`,
-        targetPlan: nextPlan,
-      },
-    );
-  }
 
   if (currentPlan === "starter") {
     incentives.push(
@@ -300,7 +267,7 @@ export function getTrialMessage(daysRemaining: number, planSlug: PlanSlug): Payw
       title: "Seu período de teste acabou",
       description: `Seu trial do plano ${plan.name} expirou. Assine agora para continuar com todos os recursos desbloqueados.`,
       cta: `Assinar ${plan.name} — ${formatPrice(plan.priceMonthly)}/mês`,
-      ctaSecondary: "Voltar para o plano Free",
+      ctaSecondary: "Ver outros planos",
       targetPlan: planSlug,
       tone: "urgent",
     };
