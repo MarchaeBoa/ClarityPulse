@@ -89,13 +89,7 @@ export default function Pricing() {
           </div>
 
           <p className="text-center text-[12px] text-ghost/50 mb-10">
-            Precisa so do basico?{" "}
-            <a
-              href="#"
-              className="text-jade hover:text-jade-hover transition-colors underline underline-offset-2"
-            >
-              Comece gratis com 10k pageviews/mes
-            </a>
+            Todos os planos incluem 14 dias de teste gratuito. Sem cartao de credito.
           </p>
         </Reveal>
 
@@ -375,7 +369,6 @@ function LimitBadge({ label, value }: { label: string; value: string }) {
    ============================================ */
 function ComparisonTable() {
   const displayPlans: PlanSlug[] = [
-    "free",
     "starter",
     "growth",
     "team",

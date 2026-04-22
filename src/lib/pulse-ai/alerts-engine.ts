@@ -119,7 +119,7 @@ export function generateSmartAlerts(): SmartAlert[] {
       currentValue: "$12,480",
       previousValue: "$11,150",
       changePercent: 11.9,
-      suggestedAction: "Mantenha a estratégia de upsell atual. Considere criar um fluxo automatizado de upgrade para usuários do plano Free.",
+      suggestedAction: "Mantenha a estratégia de upsell atual. Considere criar um fluxo automatizado de upgrade para usuários em trial.",
     },
     {
       id: "alert-page-drop",
