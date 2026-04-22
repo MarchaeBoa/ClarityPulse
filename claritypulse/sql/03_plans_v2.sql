@@ -1,38 +1,19 @@
 -- ============================================================
 -- ClarityPulse — Atualização de Planos Premium v2
--- Migração: Free → Starter → Growth → Team → Enterprise
+-- Planos: Starter → Growth → Team → Enterprise
 -- ============================================================
 
--- Desativar planos antigos
-UPDATE public.plans SET is_active = false WHERE slug IN ('starter', 'pro', 'agency');
+-- Desativar planos antigos (inclui o Free legado)
+UPDATE public.plans SET is_active = false WHERE slug IN ('free', 'starter', 'pro', 'agency');
+
+-- Remover registro do plano Free caso não possua dependências
+DELETE FROM public.plans WHERE slug = 'free'
+  AND NOT EXISTS (SELECT 1 FROM public.subscriptions s WHERE s.plan_id = plans.id)
+  AND NOT EXISTS (SELECT 1 FROM public.workspaces w WHERE w.plan_id = plans.id);
 
 -- ============================================================
 -- NOVOS PLANOS
 -- ============================================================
-
--- Atualizar Free (manter, ajustar limites)
-UPDATE public.plans
-SET
-  max_sites = 1,
-  max_pageviews_month = 10000,
-  max_members = 1,
-  data_retention_days = 90,
-  has_ai_insights = false,
-  has_session_replay = false,
-  has_whitelabel = false,
-  has_api_access = false,
-  has_scheduled_reports = false,
-  has_custom_events = true,
-  features = '[
-    "dashboard",
-    "realtime",
-    "custom_events",
-    "export_csv"
-  ]'::jsonb,
-  price_brl_monthly = NULL,
-  price_brl_yearly = NULL,
-  sort_order = 1
-WHERE slug = 'free';
 
 -- Inserir novos planos (ou atualizar se existir)
 INSERT INTO public.plans (
@@ -151,10 +132,6 @@ CREATE TABLE IF NOT EXISTS public.plan_ai_limits (
 );
 
 -- Inserir limites de IA
-INSERT INTO public.plan_ai_limits (plan_id, insights_interval_sec, chat_messages_per_day, chat_enabled)
-SELECT id, -1, 0, false FROM public.plans WHERE slug = 'free'
-ON CONFLICT (plan_id) DO UPDATE SET insights_interval_sec = -1, chat_messages_per_day = 0, chat_enabled = false;
-
 INSERT INTO public.plan_ai_limits (plan_id, insights_interval_sec, chat_messages_per_day, chat_enabled)
 SELECT id, 43200, 20, true FROM public.plans WHERE slug = 'starter_v2'
 ON CONFLICT (plan_id) DO UPDATE SET insights_interval_sec = 43200, chat_messages_per_day = 20, chat_enabled = true;

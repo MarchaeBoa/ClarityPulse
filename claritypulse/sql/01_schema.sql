@@ -17,7 +17,7 @@ CREATE TABLE public.plans (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name                    text NOT NULL,
   slug                    text NOT NULL UNIQUE,
-  -- 'free' | 'starter' | 'pro' | 'agency' | 'enterprise'
+  -- 'starter' | 'growth' | 'team' | 'enterprise'
   max_sites               integer NOT NULL DEFAULT 1,
   -- -1 = ilimitado
   max_pageviews_month     bigint NOT NULL DEFAULT 10000,
@@ -45,11 +45,10 @@ INSERT INTO public.plans (name, slug, max_sites, max_pageviews_month, max_member
   data_retention_days, has_ai_insights, has_api_access, has_scheduled_reports,
   has_custom_events, price_brl_monthly, price_brl_yearly, sort_order)
 VALUES
-  ('Free',       'free',       1,  10000,    1,  90,  false, false, false, true,  NULL,    NULL,    1),
-  ('Starter',    'starter',    3,  100000,   2,  365, true,  false, true,  true,  4900,    39000,   2),
-  ('Pro',        'pro',        10, 1000000,  10, 730, true,  true,  true,  true,  14900,   119000,  3),
-  ('Agency',     'agency',     -1, 5000000,  -1, 1095,true,  true,  true,  true,  39900,   319000,  4),
-  ('Enterprise', 'enterprise', -1, -1,       -1, 1825,true,  true,  true,  true,  NULL,    NULL,    5);
+  ('Starter',    'starter',    3,  100000,   2,  365, true,  false, true,  true,  4900,    39000,   1),
+  ('Pro',        'pro',        10, 1000000,  10, 730, true,  true,  true,  true,  14900,   119000,  2),
+  ('Agency',     'agency',     -1, 5000000,  -1, 1095,true,  true,  true,  true,  39900,   319000,  3),
+  ('Enterprise', 'enterprise', -1, -1,       -1, 1825,true,  true,  true,  true,  NULL,    NULL,    4);
 
 -- ============================================================
 -- DOMÍNIO: IDENTIDADE
@@ -107,12 +106,12 @@ CREATE TRIGGER workspaces_updated_at
   BEFORE UPDATE ON public.workspaces
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Associar plano Free ao criar workspace
-CREATE OR REPLACE FUNCTION public.assign_free_plan()
+-- Associar plano Starter (trial) ao criar workspace
+CREATE OR REPLACE FUNCTION public.assign_default_plan()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF NEW.plan_id IS NULL THEN
-    SELECT id INTO NEW.plan_id FROM public.plans WHERE slug = 'free' LIMIT 1;
+    SELECT id INTO NEW.plan_id FROM public.plans WHERE slug = 'starter' LIMIT 1;
   END IF;
   RETURN NEW;
 END;
@@ -120,7 +119,7 @@ $$;
 
 CREATE TRIGGER workspaces_assign_plan
   BEFORE INSERT ON public.workspaces
-  FOR EACH ROW EXECUTE FUNCTION public.assign_free_plan();
+  FOR EACH ROW EXECUTE FUNCTION public.assign_default_plan();
 
 -- ============================================================
 -- DOMÍNIO: MEMBROS E PERMISSÕES
@@ -201,22 +200,22 @@ CREATE TRIGGER subscriptions_updated_at
   BEFORE UPDATE ON public.subscriptions
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Criar subscription Free automaticamente ao criar workspace
-CREATE OR REPLACE FUNCTION public.create_free_subscription()
+-- Criar subscription em trial (Starter) automaticamente ao criar workspace
+CREATE OR REPLACE FUNCTION public.create_trial_subscription()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  free_plan_id uuid;
+  default_plan_id uuid;
 BEGIN
-  SELECT id INTO free_plan_id FROM public.plans WHERE slug = 'free' LIMIT 1;
-  INSERT INTO public.subscriptions (workspace_id, plan_id, status)
-  VALUES (NEW.id, free_plan_id, 'active');
+  SELECT id INTO default_plan_id FROM public.plans WHERE slug = 'starter' LIMIT 1;
+  INSERT INTO public.subscriptions (workspace_id, plan_id, status, trial_end)
+  VALUES (NEW.id, default_plan_id, 'trialing', now() + interval '14 days');
   RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER workspaces_create_subscription
   AFTER INSERT ON public.workspaces
-  FOR EACH ROW EXECUTE FUNCTION public.create_free_subscription();
+  FOR EACH ROW EXECUTE FUNCTION public.create_trial_subscription();
 
 CREATE TABLE public.payment_events (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),

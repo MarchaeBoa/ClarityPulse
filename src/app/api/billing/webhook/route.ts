@@ -125,7 +125,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
   // TODO: Update database
   // 1. Set subscription status to 'canceled', set canceled_at
-  // 2. Downgrade workspace to free plan
+  // 2. Desativar workspace ou bloquear acesso ate reativar assinatura
   console.log(`[webhook] Subscription deleted: workspace=${workspaceId}`);
 }
 
