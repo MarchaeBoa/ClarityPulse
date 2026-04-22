@@ -39,7 +39,7 @@ export default function Pricing() {
             <span className="text-jade">Sem surpresas.</span>
           </h2>
           <p className="text-base text-ghost leading-relaxed">
-            Comece gratis para sempre, escale quando precisar. Todos os planos
+            Escolha o plano ideal para o seu negocio. Todos os planos
             pagos incluem 14 dias de teste gratuito e migracao assistida do GA4.
           </p>
         </Reveal>
