@@ -120,7 +120,7 @@ async function validateToken(token: string): Promise<TokenCacheEntry | null> {
   // Query database for the site with this public_token
   try {
     const supabase = getAdminClient();
-    const { data: site, error } = await supabase
+    const { data: siteData, error } = await supabase
       .from('sites')
       .select('id, domain, allowed_domains, is_active, workspace_id')
       .eq('public_token', token)
@@ -133,9 +133,9 @@ async function validateToken(token: string): Promise<TokenCacheEntry | null> {
     }
 
     const entry: TokenCacheEntry = {
-      siteId: site.id,
-      allowedDomains: site.allowed_domains ?? [],
-      isActive: site.is_active,
+      siteId: site!.id,
+      allowedDomains: site!.allowed_domains ?? [],
+      isActive: site!.is_active,
       cachedAt: Date.now(),
     };
 
